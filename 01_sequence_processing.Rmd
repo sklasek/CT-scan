@@ -1,0 +1,128 @@
+---
+title: "01_sequence_processing"
+author: "Scott Klasek"
+date: "6/6/2020"
+output: github_document
+---
+
+In this project, we investigate how X-ray CT scanning changes microbial community structure in tidal estuary sediments using 16S rRNA sequence data.  
+
+We begin by determining ASVs from raw illumina sequence reads in .fastq format using DADA2.  
+
+First, load the required libraries into the RStudio environment:  
+
+```{r load libraries, echo = FALSE}
+library(dada2)
+library(tidyr)
+library(plyr)
+library(dplyr)
+library(ggplot2)
+library(phyloseq)
+library(here)
+here()
+```
+
+1) Define paths and input files & inspect read quality
+
+```{r}
+# define paths and input files
+
+fqpath <- "/Users/scottklasek/Desktop/collabs/CT_scan_communities/raw_fastq" # define path to fastq files
+fnFs <- sort(list.files(fqpath, pattern="_R1.fastq", full.names = TRUE)) # get names of F reads
+fnRs <- sort(list.files(fqpath, pattern="_R2.fastq", full.names = TRUE)) # get names of R reads
+sample.names <- sapply(strsplit(basename(fnFs), "_"), `[`, 1) # get names of samples from F reads
+filtFs <- file.path(fqpath, "filtered", paste0(sample.names, "_F_filt.fastq")) # define path and suffixes for filtered F reads
+filtRs <- file.path(fqpath, "filtered", paste0(sample.names, "_R_filt.fastq")) # define path and suffixes for filtered R reads
+names(filtFs) <- sample.names # assign F and R names
+names(filtRs) <- sample.names
+
+# inspect F and R read quality (reads are 251 bp long)
+
+plotQualityProfile(fnFs[1:2]) # F reads from the first two samples looks good, trim at 240
+plotQualityProfile(fnRs[1:2]) # R read from the first two samples looks less good, trim at 160
+```
+
+2) Use DADA2 to filter sequences, learn errors, and infer ASVs. Merge them from F and R sequences, trim merged sequences, remove chimeras, and track reads through the workflow:  
+
+```{r}
+# Filter sequences. add trimLeft=c(17,18) to trim primers if necessary
+out <- filterAndTrim(fnFs, filtFs, fnRs, filtRs, truncLen=c(240,160),
+                     maxN=0, maxEE=c(2,2), truncQ=2, rm.phix=TRUE,
+                     compress=TRUE, multithread=TRUE)
+
+# Calculate errors
+errF <- learnErrors(filtFs, multithread=TRUE)
+errR <- learnErrors(filtRs, multithread=TRUE)
+plotErrors(errF, nominalQ=TRUE)
+plotErrors(errR, nominalQ=TRUE)
+
+# Obtain ASVs
+dadaFs <- dada(filtFs, err=errF, multithread=TRUE)
+dadaRs <- dada(filtRs, err=errR, multithread=TRUE)
+
+# Merge F and R ASV sequences
+mergers <- mergePairs(dadaFs, filtFs, dadaRs, filtRs, verbose=TRUE)
+seqtab <- makeSequenceTable(mergers)
+table(nchar(getSequences(seqtab)))
+
+# Trim sequences
+seqtab.trim <- seqtab[,nchar(colnames(seqtab)) %in% 251:256]
+
+# Remove chimeras
+seqtab.nochim <- removeBimeraDenovo(seqtab.trim, method="consensus", multithread=TRUE, verbose=TRUE)
+
+# Track sequences through the workflow
+getN <- function(x) sum(getUniques(x))
+track <- cbind(out, sapply(dadaFs, getN), sapply(dadaRs, getN), sapply(mergers, getN), rowSums(seqtab.nochim))
+colnames(track) <- c("input", "filtered", "denoisedF", "denoisedR", "merged", "nonchim")
+rownames(track) <- sample.names
+tdf <- as.data.frame(track)
+tdf$filtered_out <- tdf$input-tdf$filtered
+tdf$noise_removed <- tdf$filtered-with(tdf, pmin(denoisedF, denoisedR))
+tdf$unmerged <- (tdf$filtered-tdf$noise_removed)-tdf$merged
+tdf$chimeras <- tdf$merged-tdf$nonchim
+tdf <- data.frame(sample = row.names(tdf), tdf)
+tdfs <- tdf[,c(1,7,8,9,10,11)]
+tdfl <- gather(tdfs, step, reads, nonchim:chimeras, factor_key=FALSE)
+tdfl$step <- factor(tdfl$step, levels = c("filtered_out","noise_removed","unmerged","chimeras", "nonchim"))
+track.reads <- ggplot(tdfl,aes(sample,reads,fill=step))
+track.reads.plot <- track.reads+
+  geom_bar(stat="identity")+
+  scale_y_continuous(breaks = c(1000,5000,50000,100000,150000,200000,250000))+
+  theme_bw()+
+  theme(axis.text.x = element_text(angle = 60, hjust = 1))
+track.reads.plot
+```
+
+3) Assign taxonomy
+
+```{r}
+taxa <- assignTaxonomy(seqtab.nochim, "~/Desktop/flux_resubmission/silva_nr_v132_train_set.fa", multithread=TRUE)
+taxa <- addSpecies(taxa, "~/Desktop/flux_resubmission/silva_species_assignment_v132.fa")
+taxa.print <- taxa
+rownames(taxa.print) <- NULL
+head(taxa.print)
+```
+
+4) Obtain metadata from sample names
+
+```{r}
+metadata <- data.frame("sample_name"=sample.names,
+                       "soil_type"=substring(sample.names, 1,1),
+                       "days_grown"=as.numeric(substring(sample.names, 2,3)),
+                       "harvest_time"=as.numeric(substring(sample.names, 4,4)),
+                       "rep"=as.numeric(substring(sample.names, 5,5)),
+                       "rhizo_root"=as.numeric(substring(sample.names, 6,6)),
+                       "miseq_run"=as.numeric(substring(sample.names, 7,7)))
+metadata$inoc <- ifelse(metadata$soil_type == "A", "Autoclaved",
+                        ifelse(metadata$soil_type == "S", "Inoculated",
+                        ifelse(metadata$soil_type == "B", "Extraction blank",
+                        ifelse(metadata$soil_type == "R", "Raw SBC", NA))))
+metadata$timeofday <- ifelse(metadata$harvest_time == 1, "9:00 AM",
+                      ifelse(metadata$harvest_time == 2, "14:00 PM",
+                      ifelse(metadata$harvest_time == 3, "18:00 PM",
+                      ifelse(metadata$harvest_time == 4, "22:00 PM", 
+                      ifelse(metadata$harvest_time == 5, "4:00 AM", NA)))))
+rownames(metadata) <- sample.names
+```
+
