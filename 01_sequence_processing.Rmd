@@ -243,6 +243,18 @@ ps4
 saveRDS(ps4, file = "ps4")
 ```
 
+
+## 10) Inspect composition of extraction blank
+
+```{r}
+blank <- subset_samples(ps3, core=="B")
+blank.top100 <- names(sort(taxa_sums(blank), decreasing=TRUE))[1:100]
+blank.ps.top100 <- transform_sample_counts(blank, function(OTU) OTU/sum(OTU))
+blank.ps.top100 <- prune_taxa(blank.top100, blank.ps.top100)
+pcr_blank_barplot <- plot_bar(blank.ps.top100, fill="Class")
+pcr_blank_barplot
+```
+
 Now we're done. Move on to 02_sequence_analysis.Rmd
 
 
