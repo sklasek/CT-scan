@@ -11,7 +11,7 @@ We begin by determining ASVs from raw illumina sequence reads in .fastq format u
 
 ## 0) Load the required libraries into the RStudio environment:  
 
-```{r libraries, echo = FALSE}
+```{r libraries}
 library(dada2)
 library(tidyr)
 library(plyr)
@@ -240,6 +240,7 @@ ct.sample.depth <- ggplot(data=df.ct, aes(x=Index, y=LibrarySize, color=core)) +
 df.ct[1:12,] # ten samples have fewer reads than the blank and should obviously be discarded. the last sample here has 4622 reads
 ps4 <- prune_samples(sample_sums(ps3)>=4622, ps3)
 ps4
+saveRDS(ps4, file = "ps4")
 ```
 
 Now we're done. Move on to 02_sequence_analysis.Rmd
