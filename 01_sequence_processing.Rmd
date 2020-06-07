@@ -162,20 +162,86 @@ fit <- pml(treeNJ, data=phang.align)
 fitGTR <- update(fit, k=4, inv=0.2)
 ```
 
-## 6) Make a DNA stringset and combine all these into a phyloseq object:  
+## 6) Combine all these into a phyloseq object and make a DNA stringset:  
 
 ```{r stringset and phyloseq object}
-dna <- Biostrings::DNAStringSet(taxa_names(ps1))
-names(dna) <- taxa_names(ps1)
-ps1 <- merge_phyloseq(ps1, dna)
-taxa_names(ps1) <- paste0("ASV", seq(ntaxa(ps1)))
 ps1 <- phyloseq(otu_table(seqtab.nochim, taxa_are_rows=FALSE), 
                sample_data(metadata), 
                phy_tree(fitGTR$tree),
                tax_table(taxa))
+dna <- Biostrings::DNAStringSet(taxa_names(ps1))
+names(dna) <- taxa_names(ps1)
 ps1 <- merge_phyloseq(ps1, dna)
+taxa_names(ps1) <- paste0("ASV", seq(ntaxa(ps1)))
 saveRDS(ps1, file = "ps1")
 ps1
 ```
+
+## 7) Remove unwanted taxa from the phyloseq object
+
+```{r}
+# make a table showing numbers of ASVs and their reads from these groups:
+ASV_classifications <- c("Bacteria","Archaea","Eukaryota", "Unclassified", "Chloroplast","Mitochondria")
+num_ASVs <- c(sum(tax_table(ps1)[,1]=="Bacteria", na.rm = TRUE),
+               sum(tax_table(ps1)[,1]=="Archaea", na.rm=TRUE),
+               sum(tax_table(ps1)[,1]=="Eukaryota", na.rm=TRUE),
+               sum(is.na(tax_table(ps1)[,1])),
+               sum(tax_table(ps1)[,4]=="Chloroplast", na.rm=TRUE), 
+               sum(tax_table(ps1)[,5]=="Mitochondria", na.rm=TRUE))
+num_ASVcounts <- c(sum(otu_table(ps1)[,which(tax_table(ps1)[,1]=="Bacteria")], na.rm = TRUE),
+              sum(otu_table(ps1)[,which(tax_table(ps1)[,1]=="Archaea")], na.rm = TRUE),
+              sum(otu_table(ps1)[,which(tax_table(ps1)[,1]=="Eukaryota")], na.rm = TRUE), 
+              sum(is.na(tax_table(ps1)[,1])),
+              sum(otu_table(ps1)[,which(tax_table(ps1)[,4]=="Chloroplast")], na.rm = TRUE), 
+              sum(otu_table(ps1)[,which(tax_table(ps1)[,5]=="Mitochondria")], na.rm = TRUE))
+asv.table <- cbind.data.frame(ASV_classifications, num_ASVs, num_ASVcounts)
+asv.table
+
+ps2 <- subset_taxa(ps1, (Kingdom!="Eukaryota")) # unknown and eukaryote ASVs removed
+ps2 <- subset_taxa(ps2, (Order!="Chloroplast") | is.na(Order)) # chloroplasts removed
+ps2 <- subset_taxa(ps2, (Family!="Mitochondria") | is.na(Family)) # mitochondria removed
+ps2 # 98 Unknown, Eukaryote, Mitochondrial, and Chloroplast taxa removed 
+```
+
+## 8) Use decontam to identify and remove contaminant
+
+```{r}
+sample_data(ps2)$is.neg <- sample_data(ps2)$core == "B" # Identify the extraction blank as $is.neg
+ps2.decontam.prev <- isContaminant(ps2, method="prevalence", neg="is.neg") # run decontam, prevalence method (don't have quantitative data for frequency)
+decontam.prev.table <- table(ps2.decontam.prev$contaminant)
+decontam.prev.table # One contaminant identified
+
+ps2.decontam.prev05 <- isContaminant(ps2, method="prevalence", neg="is.neg", threshold = 0.5) # run decontam, prevalence method with a higher threshold of 0.5
+decontam.prev05.table <- table(ps2.decontam.prev05$contaminant)
+decontam.prev05.table # Still only one contaminant identified
+
+ps2.decontam.prev.mx <- subset(tax_table(ps2)[which(ps2.decontam.prev$contaminant),]) 
+ps2.decontam.prev.mx # it's a methanolobus
+
+contam <- rownames(ps2.decontam.prev.mx) # the contaminant ASV
+allnames <- rownames(tax_table(ps2)) # the taxa names
+ps2.uncontam <- allnames[!allnames %in% contam] # gives us the noncontaminant ASVs
+length(ps2.uncontam) # 7123 noncontaminant ASVs
+ps3 <- prune_taxa(ps2.uncontam, ps2) # remove the contaminant
+ps3
+```
+
+## 9) Identify and prune low-abundance samples (and blank):
+
+```{r}
+df.ct <- as.data.frame(sample_data(ps3)) # make a dataframe from the sample data
+df.ct$LibrarySize <- sample_sums(ps3) # obtain library size
+df.ct <- df.ct[order(df.ct$LibrarySize),] # order by library size
+df.ct$Index <- seq(nrow(df.ct)) # index by library size
+ct.sample.depth <- ggplot(data=df.ct, aes(x=Index, y=LibrarySize, color=core)) + 
+  geom_point() + 
+  scale_y_continuous(breaks = c(2000,5000,10000,25000))
+  ggtitle("After decontamination") # plot
+df.ct[1:12,] # ten samples have fewer reads than the blank and should obviously be discarded. the last sample here has 4622 reads
+ps4 <- prune_samples(sample_sums(ps3)>=4622, ps3)
+ps4
+```
+
+Now we're done. Move on to 02_sequence_analysis.Rmd
 
 
