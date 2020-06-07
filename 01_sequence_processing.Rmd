@@ -238,7 +238,8 @@ ct.sample.depth <- ggplot(data=df.ct, aes(x=Index, y=LibrarySize, color=core)) +
   scale_y_continuous(breaks = c(2000,5000,10000,25000))
   ggtitle("After decontamination") # plot
 df.ct[1:12,] # ten samples have fewer reads than the blank and should obviously be discarded. the last sample here has 4622 reads
-ps4 <- prune_samples(sample_sums(ps3)>=4622, ps3)
+ps4 <- prune_samples(sample_sums(ps3)>=4622, ps3) # remove samples with < 4622 reads
+ps4 <- prune_taxa(taxa_sums(ps4) > 0, ps4) # remove taxa that were only present in samples that have been removed
 ps4
 saveRDS(ps4, file = "ps4")
 ```
