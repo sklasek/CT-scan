@@ -7,24 +7,27 @@ output: github_document
 
 In this project, we investigate how X-ray CT scanning changes microbial community structure in tidal estuary sediments using 16S rRNA sequence data.  
 
-We begin by determining ASVs from raw illumina sequence reads in .fastq format using DADA2.  
+We begin by determining ASVs from raw illumina sequence reads in .fastq format using DADA2, which gives a sequence table. Then define taxonomy and write metadata. Taxonomy and metadata tables are combined with the sequence table to make a phyloseq object.  
 
-First, load the required libraries into the RStudio environment:  
+## 0) Load the required libraries into the RStudio environment:  
 
-```{r load libraries, echo = FALSE}
+```{r libraries, echo = FALSE}
 library(dada2)
 library(tidyr)
 library(plyr)
 library(dplyr)
 library(ggplot2)
 library(phyloseq)
+library(decontam)
+library(DECIPHER)
+library(phangorn)
 library(here)
 here()
 ```
 
-1) Define paths and input files & inspect read quality
+## 1) Define paths and input files & inspect read quality
 
-```{r}
+```{r setup}
 # define paths and input files
 
 fqpath <- "/Users/scottklasek/Desktop/collabs/CT_scan_communities/raw_fastq" # define path to fastq files
@@ -42,9 +45,9 @@ plotQualityProfile(fnFs[1:2]) # F reads from the first two samples looks good, t
 plotQualityProfile(fnRs[1:2]) # R read from the first two samples looks less good, trim at 160
 ```
 
-2) Use DADA2 to filter sequences, learn errors, and infer ASVs. Merge them from F and R sequences, trim merged sequences, remove chimeras, and track reads through the workflow:  
+## 2) Use DADA2 to filter sequences, learn errors, and infer ASVs. Merge them from F and R sequences, trim merged sequences, remove chimeras, and track reads through the workflow:  
 
-```{r}
+```{r asvs}
 # Filter sequences. add trimLeft=c(17,18) to trim primers if necessary
 out <- filterAndTrim(fnFs, filtFs, fnRs, filtRs, truncLen=c(240,160),
                      maxN=0, maxEE=c(2,2), truncQ=2, rm.phix=TRUE,
@@ -94,35 +97,85 @@ track.reads.plot <- track.reads+
 track.reads.plot
 ```
 
-3) Assign taxonomy
+## 3) Assign taxonomy
 
-```{r}
+```{r taxonomy}
 taxa <- assignTaxonomy(seqtab.nochim, "~/Desktop/flux_resubmission/silva_nr_v132_train_set.fa", multithread=TRUE)
-taxa <- addSpecies(taxa, "~/Desktop/flux_resubmission/silva_species_assignment_v132.fa")
+# taxa <- addSpecies(taxa, "~/Desktop/flux_resubmission/silva_species_assignment_v132.fa") you can assign species if you have more memory than this computer does:
+# Error: vector memory exhausted (limit reached?)
 taxa.print <- taxa
 rownames(taxa.print) <- NULL
 head(taxa.print)
 ```
 
-4) Obtain metadata from sample names
+## 4) Obtain metadata from sample names (directly and indirectly):  
 
-```{r}
+```{r metadata}
+# create data frame
 metadata <- data.frame("sample_name"=sample.names,
-                       "soil_type"=substring(sample.names, 1,1),
-                       "days_grown"=as.numeric(substring(sample.names, 2,3)),
-                       "harvest_time"=as.numeric(substring(sample.names, 4,4)),
-                       "rep"=as.numeric(substring(sample.names, 5,5)),
-                       "rhizo_root"=as.numeric(substring(sample.names, 6,6)),
-                       "miseq_run"=as.numeric(substring(sample.names, 7,7)))
-metadata$inoc <- ifelse(metadata$soil_type == "A", "Autoclaved",
-                        ifelse(metadata$soil_type == "S", "Inoculated",
-                        ifelse(metadata$soil_type == "B", "Extraction blank",
-                        ifelse(metadata$soil_type == "R", "Raw SBC", NA))))
-metadata$timeofday <- ifelse(metadata$harvest_time == 1, "9:00 AM",
-                      ifelse(metadata$harvest_time == 2, "14:00 PM",
-                      ifelse(metadata$harvest_time == 3, "18:00 PM",
-                      ifelse(metadata$harvest_time == 4, "22:00 PM", 
-                      ifelse(metadata$harvest_time == 5, "4:00 AM", NA)))))
+                       "core"=substring(sample.names, 1,1),
+                       "depth_cm"=as.numeric(substring(sample.names, 3,4)),
+                       "date"=as.numeric(substring(sample.names, 6,7)))
+
+# assign scanned/unscanned cores
+metadata$scan <- ifelse(metadata$core == "2", "Unscanned",
+                        ifelse(metadata$core == "3", "Scanned",
+                        ifelse(metadata$core == "4", "Unscanned",
+                        ifelse(metadata$core == "5", "Scanned",
+                        ifelse(metadata$core == "B", NA, NA)))))
+
+# assign north/south site
+metadata$site <- ifelse(metadata$core == "2", "North",
+                        ifelse(metadata$core == "3", "North",
+                        ifelse(metadata$core == "4", "South",
+                        ifelse(metadata$core == "5", "South",
+                        ifelse(metadata$core == "B", NA, NA)))))
+# make rownames sample names
 rownames(metadata) <- sample.names
+
+# write the storage time as a function of date
+metadata$storage_days <- metadata$date-5 # cores collected on July 5
+
+# define sediment type (tsunami deposit vs non-deposit)
+metadata$sedtype <- ifelse(
+  ((metadata$site=="North") &
+    (metadata$depth_cm < 63) &
+    (metadata$depth_cm > 59) |
+    (metadata$site=="South") &
+    (metadata$depth_cm < 71) &
+    (metadata$depth_cm > 68)),
+"Tsunami Deposit",
+"Estuary Sediment"
+)
 ```
+
+## 5) Make a phylogenetic tree for Unifrac calculations:  
+
+```{r phylogenetic tree}
+seqs <- getSequences(seqtab.nochim)
+names(seqs) <- seqs
+alignment <- AlignSeqs(DNAStringSet(seqs), anchor=NA) # this took ~50 minutes
+phang.align <- phyDat(as(alignment, "matrix"), type="DNA")
+dm <- dist.ml(phang.align) # started 3:05 pm, finished around an hour later? 
+treeNJ <- NJ(dm) # Note, tip order != sequence order ## this takes at least an hour... started 6:01 pm
+fit <- pml(treeNJ, data=phang.align)
+fitGTR <- update(fit, k=4, inv=0.2)
+```
+
+## 6) Make a DNA stringset and combine all these into a phyloseq object:  
+
+```{r stringset and phyloseq object}
+dna <- Biostrings::DNAStringSet(taxa_names(ps1))
+names(dna) <- taxa_names(ps1)
+ps1 <- merge_phyloseq(ps1, dna)
+taxa_names(ps1) <- paste0("ASV", seq(ntaxa(ps1)))
+ps1 <- phyloseq(otu_table(seqtab.nochim, taxa_are_rows=FALSE), 
+               sample_data(metadata), 
+               phy_tree(fitGTR$tree),
+               tax_table(taxa))
+ps1 <- merge_phyloseq(ps1, dna)
+saveRDS(ps1, file = "ps1")
+ps1
+```
+
 
