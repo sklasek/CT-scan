@@ -1,0 +1,65 @@
+---
+title: "02_sequence_analysis.Rmd"
+author: "Scott Klasek"
+date: "6/7/2020"
+output: github_document
+---
+
+## 0) load libraries and import phyloseq object:
+
+```{r libraries}
+library(tidyr)
+library(plyr)
+library(dplyr)
+library(ggplot2)
+library(phyloseq)
+library(DESeq2)
+library(here)
+here()
+ps4 <- readRDS(file = "ps4")
+```
+
+## 1) Basic bar plot of all samples
+
+```{r}
+ps4.ra <- transform_sample_counts(ps4, function(OTU) OTU/sum(OTU)) # transform read counts to relative abundances
+
+# graph sequences belonging to most abundant classes (as done with the OTU dataset) 
+classes.ps4 <- unique(tax_table(ps4)[,3]) # obtains the 122 unique class names
+classes.ps4 <- classes.ps4[!is.na(classes.ps4)] # removes the NA (121 unique classes)
+mx.asv.ra <- as.data.frame(otu_table(ps4.ra)) # creates a matrix from the phyloseq object
+class.ra <- vector("list",0) # define vector
+for (i in classes.ps4) {class.ra[[i]] <- sum(mx.asv.ra[,which(tax_table(ps4.ra)[,3]==i)])/44} # calculate average % abund of each class
+class.output <- cbind(class.ra)[,1] 
+class.output.n <- as.numeric(cbind(class.ra)[,1]) # convert output to numeric
+class.output.df <- class.output.df[order(-class.output.df$class.output.n),] # sort by pct abundance in descending order
+top.c <- as.character(class.output.df[1:17,1]) # the most abundant 17 classes are each > 1% relabund, selecting these
+sum(class.output.df[1:17,2]) # 77% of reads are from these top 17 classes
+ps4.ra.top.c <- subset_taxa(ps4.ra, Class=="Deltaproteobacteria" | Class=="Gammaproteobacteria" | Class=="Anaerolineae" | Class=="Alphaproteobacteria" | Class==  "Ignavibacteria" | Class=="Nitrospira" | Class=="Thermodesulfovibrionia" | Class=="Bacteroidia" | Class=="Campylobacteria" | Class=="Phycisphaerae" | Class==    "Acidobacteriia" | Class=="Dehalococcoidia" | Class=="Woesearchaeia" | Class== "Verrucomicrobiae"| Class=="NC10" | Class== "Spirochaetia" | Class==     "Calditrichia") # top classes. just setting Class==top.c doesn't work and eliminates a lot of ASVs for a reason I don't understand
+top.c.bp <- plot_bar(ps4.ra.top.c, fill="Class") # barplot showing ASVs belonging to classes > 1% abundance
+
+# graph most abundant 300 ASVs regardless of class
+ps4.ra.top300.names <- names(sort(taxa_sums(ps4.ra), decreasing=TRUE))[1:300]
+ps4.ra.top300 <- prune_taxa(ps4.ra.top300.names, ps4.ra)
+top300bp <- plot_bar(ps4.ra.top300, fill="Class")
+
+# compare bar graphs
+top.c.bp
+top300bp # more sparse BUT it shows there are a few class==NA ASVs highly abundant in South core tsunami deposits. they appear to be Zixibacteria
+
+top.c.bp+
+  facet_grid(~core, scales = "free", space = "free")
+```
+
+## 2) Basic alpha diversity plot of all samples
+
+```{r}
+ps4 <- prune_taxa(taxa_sums(ps4) > 0, ps4) # we still had a few 
+ps4
+```
+
+
+## 3) Normalizations and ordinations
+
+
+
