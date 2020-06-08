@@ -14,6 +14,8 @@ library(dplyr)
 library(ggplot2)
 library(phyloseq)
 library(DESeq2)
+library(vegan)
+library(metagenomeSeq)
 library(patchwork)
 library(RColorBrewer)
 library(here)
@@ -151,6 +153,114 @@ t.test(alphadiv[which(alphadiv$sedtype=="Estuary Sediment"),]$Shannon, alphadiv[
 ## 3) Normalizations and ordinations
 
 ```{r}
+## First, transform data, try Hellinger transformation
+otu_table(ps4)[1:5,1:5]
+otu.ps4.hell <- otu_table(decostand(otu_table(ps4), method = "hellinger"), taxa_are_rows=FALSE)
+ps4.hel <- phyloseq(tax_table(ps4),
+                    sample_data(ps4),
+                    otu_table(otu.ps4.hell),
+                    phy_tree(ps4),
+                    refseq(ps4))
+
+# Another transformation: cumulative sum squares
+write.csv(otu_table(ps4),"ps4.otu.table")
+ps4.otu <- read.csv(file = "ps4.otu.table", header = TRUE) # Why did I write a .csv just to reimport it? https://github.com/HCBravoLab/metagenomeSeq/issues/76
+rownames(ps4.otu) <- ps4.otu[,1]
+ps4.otu <- ps4.otu[,-1]
+ps4.otu <- t(ps4.otu)
+ps4.otu.MR <- newMRexperiment(ps4.otu)
+ps4.otu.css <- cumNorm(ps4.otu.MR) 
+ps4.otu.css <- MRcounts(ps4.otu.css, norm = T)
+ps4.css <- phyloseq(tax_table(ps4),
+                    sample_data(ps4),
+                    otu_table(ps4.otu.css, taxa_are_rows=TRUE),
+                    phy_tree(ps4),
+                    refseq(ps4))
+
+## Now generate distance matrices:
+# binary jaccard here
+dm.ps4.hel.jac <- phyloseq::distance(ps4.hel, method = "jaccard", binary = TRUE) 
+dm.ps4.css.jac <- phyloseq::distance(ps4.css, method = "jaccard", binary = TRUE)
+# weighted unifrac here
+dm.ps4.hel.wu <- phyloseq::distance(ps4.hel, method = "wunifrac") 
+dm.ps4.css.wu <- phyloseq::distance(ps4.css, method = "wunifrac")
+
+## Make ordinations
+ord.ps4.hel.nmds.bc <- ordinate(ps4.hel, "NMDS", "bray") # no need to specify a distance matrix with bray-curtis
+ord.ps4.css.nmds.bc <- ordinate(ps4.css, "NMDS", "bray")
+ord.ps4.hel.pcoa.bc <- ordinate(ps4.hel, "PCoA", "bray") 
+ord.ps4.css.pcoa.bc <- ordinate(ps4.css, "PCoA", "bray")
+ord.ps4.css.pcoa.bjac <- ordinate(ps4, method="PCoA", distance=dm.ps4.css.jac) # don't need to transform with binary jaccard
+ord.ps4.css.pcoa.wu <- ordinate(ps4, method="PCoA", distance=dm.ps4.css.wu)
+ord.ps4.hel.pcoa.wu <- ordinate(ps4, method="PCoA", distance=dm.ps4.hel.wu)
+
+## Generate a few rough-draft ordination plots:
+ord1 <- plot_ordination(ps4.hel, ord.ps4.hel.nmds.bc, color="site", title="NMDS Bray-Curtis hellinger, stress=0.067 but no convergence")
+ord2 <- plot_ordination(ps4.css, ord.ps4.css.nmds.bc, color="site", title="NMDS Bray-Curtis CSS, stress=0.0747")
+ord3 <- plot_ordination(ps4.hel, ord.ps4.hel.pcoa.bc, color="site", title="PCoA Bray-Curtis hellinger")
+ord4 <- plot_ordination(ps4.css, ord.ps4.css.pcoa.bc, color="site", title="PCoA Bray-Curtis CSS")
+# PCoAs seem to show better clustering than NMDS. Though minimal difference in transformation types, CSS shows just a little more variation than hellinger.
+ord5 <- plot_ordination(ps4.css, ord.ps4.css.pcoa.bjac, color="site", title="PCoA Binary Jaccard") # binary jaccard shows least variance 
+ord6 <- plot_ordination(ps4.css, ord.ps4.css.pcoa.wu, color="scan", shape="site", title="PCoA weighted unifrac, CSS") # 54 by 10%
+ord7 <- plot_ordination(ps4.hel, ord.ps4.hel.pcoa.wu, color="site", title="PCoA weighted unifrac, hellinger")
+# weighted unifrac shows by far the most variance. hellinger shows slightly more variation but less separation in N samples
+
+# Split up the CSS-transformed phyloseq objects by North/South
+ps4.css.north <- subset_samples(ps4.css, site=="North")
+ps4.css.south <- subset_samples(ps4.css, site=="South")
+
+# Add in the above/below/within tsunami deposit. Note that tsunami deposit depths are different in different cores
+sample_data(ps4.css.north)$position <- ifelse(sample_data(ps4.css.north)$sedtype=="Tsunami Deposit", "Within",
+  ifelse(sample_data(ps4.css.north)$sedtype=="Estuary Sediment" & sample_data(ps4.css.north)$depth_cm < 60, "Above",
+  ifelse(sample_data(ps4.css.north)$sedtype=="Estuary Sediment" & sample_data(ps4.css.north)$depth_cm > 62, "Below", NA)))
+sample_data(ps4.css.south)$position <- ifelse(sample_data(ps4.css.south)$sedtype=="Tsunami Deposit", "Within",
+  ifelse(sample_data(ps4.css.south)$sedtype=="Estuary Sediment" & sample_data(ps4.css.south)$depth_cm < 69, "Above",
+  ifelse(sample_data(ps4.css.south)$sedtype=="Estuary Sediment" & sample_data(ps4.css.south)$depth_cm > 70, "Below", NA)))
+
+# Ordinate North/South separately, and label by above/within/below deposit (or sedtype) and add label=depth_cm. Maybe also storage time?
+dm.ps4.css.north.wu <- phyloseq::distance(ps4.css.north, method = "wunifrac")
+dm.ps4.css.south.wu <- phyloseq::distance(ps4.css.south, method = "wunifrac")
+ord.ps4.css.north.pcoa.wu <- ordinate(ps4.css.north, method="PCoA", distance=dm.ps4.css.north.wu)
+ord.ps4.css.south.pcoa.wu <- ordinate(ps4.css.south, method="PCoA", distance=dm.ps4.css.south.wu)
+ord8 <- plot_ordination(ps4.css.north, ord.ps4.css.north.pcoa.wu, color="storage_days", label="depth_cm", title="North- PCoA weighted unifrac, CSS")
+ord9 <- plot_ordination(ps4.css.south, ord.ps4.css.south.pcoa.wu, color="storage_days", label="depth_cm", title="South- PCoA weighted unifrac, CSS")
+ord10 <- plot_ordination(ps4.css.north, ord.ps4.css.north.pcoa.wu, color="position", label="depth_cm", title="North- PCoA weighted unifrac, CSS")
+ord11 <- plot_ordination(ps4.css.south, ord.ps4.css.south.pcoa.wu, color="position", label="depth_cm", title="South- PCoA weighted unifrac, CSS")
+
+# final ordination plots
+gg.ord.all <- plot_ordination(ps4.css, ord.ps4.css.pcoa.wu, color="scan", shape="site", title="PCoA weighted unifrac, CSS") #
+gg.ord.all
+
+gg.ord.storage <- ord8 + ord9 + plot_layout(guides="collect")
+gg.ord.storage
+
+gg.ord.sites <- ord10 + ord11 + plot_layout(guides="collect")
+gg.ord.sites
 
 ```
+
+1 of 2 NMDS converged, and the PCoAs captured under 50% of the variation. PCoAs seem to show better clustering though
+Little difference in the transformations (Hellinger or CSS) but CSS shows just a little more variation
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
