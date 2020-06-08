@@ -222,30 +222,101 @@ dm.ps4.css.north.wu <- phyloseq::distance(ps4.css.north, method = "wunifrac")
 dm.ps4.css.south.wu <- phyloseq::distance(ps4.css.south, method = "wunifrac")
 ord.ps4.css.north.pcoa.wu <- ordinate(ps4.css.north, method="PCoA", distance=dm.ps4.css.north.wu)
 ord.ps4.css.south.pcoa.wu <- ordinate(ps4.css.south, method="PCoA", distance=dm.ps4.css.south.wu)
-ord8 <- plot_ordination(ps4.css.north, ord.ps4.css.north.pcoa.wu, color="storage_days", label="depth_cm", title="North- PCoA weighted unifrac, CSS")
-ord9 <- plot_ordination(ps4.css.south, ord.ps4.css.south.pcoa.wu, color="storage_days", label="depth_cm", title="South- PCoA weighted unifrac, CSS")
-ord10 <- plot_ordination(ps4.css.north, ord.ps4.css.north.pcoa.wu, color="position", label="depth_cm", title="North- PCoA weighted unifrac, CSS")
-ord11 <- plot_ordination(ps4.css.south, ord.ps4.css.south.pcoa.wu, color="position", label="depth_cm", title="South- PCoA weighted unifrac, CSS")
+
+# these are all PCoA weighted unifrac, CSS:
+ord8 <- plot_ordination(ps4.css.north, ord.ps4.css.north.pcoa.wu, color="storage_days", title="North Site") +
+  geom_point(size=2) +
+  geom_text(aes(label=depth_cm), size=3, nudge_x = 0.01, nudge_y = 0.005) +
+  scale_color_continuous("Storage (days)") +
+  theme_bw()
+ord9 <- plot_ordination(ps4.css.south, ord.ps4.css.south.pcoa.wu, color="storage_days", title="South Site") +
+  geom_point(size=2) +
+  geom_text(aes(label=depth_cm), size=3, nudge_x = 0.01, nudge_y = 0.01) +
+  scale_color_continuous("Storage (days)") +
+  theme_bw()
+ord10 <- plot_ordination(ps4.css.north, ord.ps4.css.north.pcoa.wu, color="position") +
+  geom_point(size=2) +
+  stat_ellipse() +
+  geom_text(aes(label=depth_cm), size=3, color="black", nudge_x = 0.01, nudge_y = 0.01) +
+  ggtitle("B") +
+  geom_text(aes(label="North Site"), color="black", x=0.1, y=0.15, show.legend = FALSE) +
+  theme_bw() +
+  theme(legend.position = "none")
+ord11 <- plot_ordination(ps4.css.south, ord.ps4.css.south.pcoa.wu, color="position") +
+  geom_point(size=2) +
+  stat_ellipse() +
+  geom_text(aes(label=depth_cm), size=3, color="black", nudge_x = 0.01, nudge_y = 0.01) +
+  scale_color_discrete("Position relative to \nTsunami Layer") +
+  ggtitle("C") +
+  geom_text(aes(label="South Site"), color="black", x=-0.13, y=0.15, show.legend = FALSE) +
+  theme_bw()
 
 # final ordination plots
-gg.ord.all <- plot_ordination(ps4.css, ord.ps4.css.pcoa.wu, color="scan", shape="site", title="PCoA weighted unifrac, CSS") #
+gg.ord.all <- plot_ordination(ps4.css, ord.ps4.css.pcoa.wu, color="scan", shape="site") +
+  geom_point(size=2) +
+  scale_shape_discrete("Coring Site") +
+  scale_color_discrete("Treatment") +
+  ggtitle("A") +
+  geom_text(aes(label="Both Sites"), color="black", x=-0.1, y=0.2, show.legend = FALSE) +
+  theme_bw() # PCoA weighted unifrac, CSS
 gg.ord.all
 
 gg.ord.storage <- ord8 + ord9 + plot_layout(guides="collect")
 gg.ord.storage
 
-gg.ord.sites <- ord10 + ord11 + plot_layout(guides="collect")
-gg.ord.sites
+gg.ord.final <- gg.ord.all + ord10 + ord11
+gg.ord.final
+```
+
+## 4) To follow up on the ordinations, do some tests for significance
+
+```{r}
 
 ```
 
-1 of 2 NMDS converged, and the PCoAs captured under 50% of the variation. PCoAs seem to show better clustering though
-Little difference in the transformations (Hellinger or CSS) but CSS shows just a little more variation
+## 5) Biomarker detection between scanned/unscanned samples with DESeq2
+
+```{r}
+ps4.p <- subset_samples(ps4, is.paired="y") # only use the paired samples when looking for biomarkers
+ps4.p.ra <- transform_sample_counts(ps4.p, function(OTU) OTU/sum(OTU)) # convert paired phyloseq object into relative abundances for deseq function
+de.paired.scan <- phyloseq_to_deseq2(ps4.p, ~ scan) # convert phyloseq object into a deseq object
+
+table.from.deseq <- function(deseq, relabundps, group){
+  de.results <- DESeq(deseq, test = "Wald", fitType = "parametric", sfType = "poscounts")
+  de.results.table <- results(de.results, cooksCutoff = FALSE)
+  de.results.table <- de.results.table[which(de.results.table$padj < 0.05), ]
+  meanabund.vector <- vector("numeric", length(rownames(de.results.table)))
+  for (i in rownames(de.results.table)) {meanabund.vector[[i]] <- mean(otu_table(relabundps)[which(sample_data(relabundps)$scan==group),i])}
+  meanabund.vector <- meanabund.vector[(0.5*length(meanabund.vector)+1):length(meanabund.vector)] 
+  de.results.table <- cbind(as(meanabund.vector, "matrix"), as(de.results.table, "data.frame"), as(tax_table(relabundps)[rownames(de.results.table), ], "matrix"))
+  colnames(de.results.table)[1] <- "relabund"
+  return(de.results.table)
+}
+
+de.results.table.paired.scan <- table.from.deseq(deseq = de.paired.scan, relabundps = ps4.p.ra, group = "Scanned") # run function and calculate 
+de.results.table.paired.unscan <- table.from.deseq(deseq = de.paired.scan, relabundps = ps4.p.ra, group = "Unscanned") 
+
+# relabund values are the only thing different between these two results tables
+# negative log2FoldChange values are more abundant in Scanned samples, positive values more abundant in Unscanned
+
+# combine and merge these two tables for graphing
+de.results.table.paired.scan$treatment <- "Scanned"
+de.results.table.paired.unscan$treatment <- "Unscanned"
+de.results.table.paired.scan$asv <- rownames(de.results.table.paired.scan)
+de.results.table.paired.unscan$asv <- rownames(de.results.table.paired.unscan)
+df.biom.scan <- rbind(as(de.results.table.paired.scan, "data.frame"), as(de.results.table.paired.unscan, "data.frame")) # merge (careful, now the rownames are lies)
+
+# instead of genus name, write the most specific taxonomic category to label biomarkers with
+specific.taxon <- c(NA, "Cl. Thermodesulfovibrionia", "Cl. Gammaproteobacteria", NA, "Fam. Desulfobulbaceae", "Gen. Ignavibacterium", "Gen. Ignavibacterium", "SEEP-SRB1", "SEEP-SRB1", "Gen. Amphritea", "Gen. Thiohalophilus", "SB-5", "Gen. Desulfatitalea")
+df.biom.scan$tax.label <- rep(specific.taxon, times=2)
+
+df.biom.scan
+
+df.biom.scan$asvorder <- factor(df.biom.scan$asv, levels = df.biom.scan$asv[order(df.biom.scan$relabund)]) # order by relative abundance does not work because we have duplicate rows with the same asv. should we sort by relabund of the scanned samples, or the unscanned ones? 
 
 
 
-
-
+```
 
 
 
