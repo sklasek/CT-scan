@@ -14,12 +14,14 @@ library(dplyr)
 library(ggplot2)
 library(phyloseq)
 library(DESeq2)
+library(patchwork)
+library(RColorBrewer)
 library(here)
 here()
 ps4 <- readRDS(file = "ps4")
 ```
 
-## 1) Basic bar plot of all samples
+## 1) Bar plots showing high-level (class) community composition of all samples: 
 
 ```{r}
 ps4.ra <- transform_sample_counts(ps4, function(OTU) OTU/sum(OTU)) # transform read counts to relative abundances
@@ -35,31 +37,120 @@ class.output.n <- as.numeric(cbind(class.ra)[,1]) # convert output to numeric
 class.output.df <- class.output.df[order(-class.output.df$class.output.n),] # sort by pct abundance in descending order
 top.c <- as.character(class.output.df[1:17,1]) # the most abundant 17 classes are each > 1% relabund, selecting these
 sum(class.output.df[1:17,2]) # 77% of reads are from these top 17 classes
-ps4.ra.top.c <- subset_taxa(ps4.ra, Class=="Deltaproteobacteria" | Class=="Gammaproteobacteria" | Class=="Anaerolineae" | Class=="Alphaproteobacteria" | Class==  "Ignavibacteria" | Class=="Nitrospira" | Class=="Thermodesulfovibrionia" | Class=="Bacteroidia" | Class=="Campylobacteria" | Class=="Phycisphaerae" | Class==    "Acidobacteriia" | Class=="Dehalococcoidia" | Class=="Woesearchaeia" | Class== "Verrucomicrobiae"| Class=="NC10" | Class== "Spirochaetia" | Class==     "Calditrichia") # top classes. just setting Class==top.c doesn't work and eliminates a lot of ASVs for a reason I don't understand
-top.c.bp <- plot_bar(ps4.ra.top.c, fill="Class") # barplot showing ASVs belonging to classes > 1% abundance
+sum(class.output.df[1:10,2]) # 68% of reads are from these top 10 classes
+ps4.ra.top.c <- subset_taxa(ps4.ra, Class=="Deltaproteobacteria" | Class=="Gammaproteobacteria" | Class=="Anaerolineae" | Class=="Alphaproteobacteria" | Class==  "Ignavibacteria" | Class=="Nitrospira" | Class=="Thermodesulfovibrionia" | Class=="Bacteroidia" | Class=="Campylobacteria" | Class=="Phycisphaerae") # top classes. just setting Class==top.c doesn't work and eliminates a lot of ASVs for a reason I don't understand
 
-# graph most abundant 300 ASVs regardless of class
+# testing a few bar plots before moving to the final one:
+top.c.bp <- plot_bar(ps4.ra.top.c, fill="Class")+
+  scale_y_continuous(limits = c(0,0.9)) # barplot showing ASVs belonging to classes > 2% abundance
 ps4.ra.top300.names <- names(sort(taxa_sums(ps4.ra), decreasing=TRUE))[1:300]
 ps4.ra.top300 <- prune_taxa(ps4.ra.top300.names, ps4.ra)
-top300bp <- plot_bar(ps4.ra.top300, fill="Class")
+top300bp <- plot_bar(ps4.ra.top300, fill="Class") # barplot showing most abundant 300 ASVs regardless of class
+# top300bp is more sparse and there are more classes, BUT it shows there are a few class==NA ASVs highly abundant in South core tsunami deposits. they appear to be Zixibacteria
 
-# compare bar graphs
-top.c.bp
-top300bp # more sparse BUT it shows there are a few class==NA ASVs highly abundant in South core tsunami deposits. they appear to be Zixibacteria
+# Now the final barplot
+# subset four pseudo-panels (North/South x Scanned/Unscanned) that are each individual plots, but arrange them together
+sample_data(ps4.ra.top.c)$label <- (paste(sample_data(ps4.ra.top.c)$depth_cm, "cm,", sample_data(ps4.ra.top.c)$storage_days, "d")) # add a character vector to plot by
 
-top.c.bp+
-  facet_grid(~core, scales = "free", space = "free")
+ps4.ra.top.c.north.s <- subset_samples(ps4.ra.top.c, site=="North" & scan=="Scanned") # subset the North samples (scanned and unscanned)
+ps4.ra.top.c.north.u <- subset_samples(ps4.ra.top.c, site=="North" & scan=="Unscanned") 
+ps4.ra.top.c.south.s <- subset_samples(ps4.ra.top.c, site=="South" & scan=="Scanned") # subset the South samples (scanned and unscanned)
+ps4.ra.top.c.south.u <- subset_samples(ps4.ra.top.c, site=="South" & scan=="Unscanned") 
+
+gg.bar.top.c.north.s <- plot_bar(ps4.ra.top.c.north.s, x="label", fill="Class") +
+  geom_rect(aes(xmin=3.5, xmax=6.5, ymin=-Inf, ymax=Inf), fill="gray80", alpha=0.01) +
+  geom_bar(stat="identity", position="stack") + 
+  scale_fill_brewer(palette = "Set3") +
+  scale_x_discrete("") +
+  facet_grid(~scan, scales = "free", space = "free") +
+  ggtitle("North Site") +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 60, hjust = 1),
+        strip.text.x = element_text(size=11))
+
+gg.bar.top.c.north.u <- plot_bar(ps4.ra.top.c.north.u, x="label", fill="Class") +
+  geom_rect(aes(xmin=5.5, xmax=9.5, ymin=-Inf, ymax=Inf), fill="gray80", alpha=0.01) +
+  geom_bar(stat="identity", position="stack") + 
+  scale_fill_brewer(palette = "Set3") +
+  scale_x_discrete("") +
+  scale_y_continuous("") +
+  facet_grid(~scan, scales = "free", space = "free") +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 60, hjust = 1), axis.text.y = element_blank(),
+        axis.ticks.y = element_blank(), strip.text.x = element_text(size=11))
+
+gg.bar.top.c.south.s <- plot_bar(ps4.ra.top.c.south.s, x="label", fill="Class") +
+  geom_rect(aes(xmin=2.5, xmax=6.5, ymin=-Inf, ymax=Inf), fill="gray80", alpha=0.01) +
+  geom_bar(stat="identity", position="stack") + 
+  scale_fill_brewer(palette = "Set3") +
+  scale_x_discrete("Sample") +
+  facet_grid(~scan, scales = "free", space = "free") +
+  ggtitle("South Site") +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 60, hjust = 1),
+        strip.text.x = element_text(size=11))
+
+gg.bar.top.c.south.u <- plot_bar(ps4.ra.top.c.south.u, x="label", fill="Class") +
+  geom_rect(aes(xmin=5.5, xmax=10.5, ymin=-Inf, ymax=Inf), fill="gray80", alpha=0.01) +
+  geom_bar(stat="identity", position="stack") + 
+  scale_fill_brewer(palette = "Set3") +
+  scale_x_discrete("Sample") +
+  scale_y_continuous("") +
+  facet_grid(~scan, scales = "free", space = "free") +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 60, hjust = 1), axis.text.y = element_blank(),
+        axis.ticks.y = element_blank(), strip.text.x = element_text(size=11))
+
+barplot <- (gg.bar.top.c.north.s + gg.bar.top.c.north.u) / (gg.bar.top.c.south.s + gg.bar.top.c.south.u) + plot_layout(guides="collect")
+barplot
 ```
 
-## 2) Basic alpha diversity plot of all samples
+## 2) Alpha diversity analysis of all samples
 
 ```{r}
-ps4 <- prune_taxa(taxa_sums(ps4) > 0, ps4) # we still had a few 
-ps4
+paircode <- read.csv(file="paircode.csv") # import the file showing which samples are paired with one another
+sample_data(ps4) <- data.frame(sample_data(ps4), paircode) # add this info to the ps object
+
+plot_richness(ps4, x="scan", measures = c("Observed", "Shannon")) # simple plot
+
+alphadiv <- estimate_richness(ps4, measures = c("Observed", "Shannon")) # calculate alpha diversity
+alphadiv <- data.frame(alphadiv, sample_data(ps4)) # write metadata into an alpha diversity data frame
+
+# Is there a difference in alpha diversity between scanned and unscanned samples?
+t.test(alphadiv[which(alphadiv$scan=="Unscanned"),]$Observed, alphadiv[which(alphadiv$scan=="Scanned"),]$Observed) # observed richness, no
+t.test(alphadiv[which(alphadiv$scan=="Unscanned"),]$Shannon, alphadiv[which(alphadiv$scan=="Scanned"),]$Shannon) # shannon, no
+
+# Alpha diversity should be analyzed by pairing scanned/unscanned samples:
+df.ps4 <- data.frame(sample_data(ps4), alphadiv[,1:3]) # combine sample data and alpha diversity into a df
+df.ps4.p <- df.ps4 %>% filter(is.paired=="y") # filter only the paired samples
+df.ps4.p <- df.ps4.p[order(df.ps4.p$paircode),] # order the dataframe by their paircode
+t.test(df.ps4.p[which(df.ps4.p$scan=="Unscanned"),]$Observed, df.ps4.p[which(df.ps4.p$scan=="Scanned"),]$Observed, paired = TRUE) # t = -1.686, df = 10, p-value = 0.1227
+t.test(df.ps4.p[which(df.ps4.p$scan=="Unscanned"),]$Shannon, df.ps4.p[which(df.ps4.p$scan=="Scanned"),]$Shannon, paired = TRUE) # t = -2.0386, df = 10, p-value = 0.06881
+
+# plot alpha diversity over time
+gg.alphadiv.obs <- ggplot(alphadiv, aes(storage_days, Observed))+
+  geom_point()+
+  facet_grid(~site)
+gg.alphadiv.obs # no huge changes in observed ASV richness
+
+gg.alphadiv.sha <- ggplot(alphadiv, aes(storage_days, Shannon))+
+  geom_point()+
+  facet_grid(~site)
+gg.alphadiv.sha # no huge changes in Shannon diversity over time
+
+# alpha diversity by site (north/south)
+t.test(alphadiv[which(alphadiv$site=="North"),]$Observed, alphadiv[which(alphadiv$site=="South"),]$Observed) # not in observed richness
+t.test(alphadiv[which(alphadiv$site=="North"),]$Shannon, alphadiv[which(alphadiv$site=="South"),]$Shannon) # not in Shannon
+
+# alpha diversity by tsunami layer
+t.test(alphadiv[which(alphadiv$sedtype=="Estuary Sediment"),]$Observed, alphadiv[which(alphadiv$sedtype=="Tsunami Deposit"),]$Observed) # not in observed richness
+t.test(alphadiv[which(alphadiv$sedtype=="Estuary Sediment"),]$Shannon, alphadiv[which(alphadiv$sedtype=="Tsunami Deposit"),]$Shannon) # not in Shannon
 ```
 
 
 ## 3) Normalizations and ordinations
 
+```{r}
 
+```
 
