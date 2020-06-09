@@ -35,11 +35,11 @@ mx.asv.ra <- as.data.frame(otu_table(ps4.ra)) # creates a matrix from the phylos
 class.ra <- vector("list",0) # define vector
 for (i in classes.ps4) {class.ra[[i]] <- sum(mx.asv.ra[,which(tax_table(ps4.ra)[,3]==i)])/44} # calculate average % abund of each class
 class.output <- cbind(class.ra)[,1] 
-class.output.n <- as.numeric(cbind(class.ra)[,1]) # convert output to numeric
-class.output.df <- class.output.df[order(-class.output.df$class.output.n),] # sort by pct abundance in descending order
-top.c <- as.character(class.output.df[1:17,1]) # the most abundant 17 classes are each > 1% relabund, selecting these
-sum(class.output.df[1:17,2]) # 77% of reads are from these top 17 classes
-sum(class.output.df[1:10,2]) # 68% of reads are from these top 10 classes
+what <- data.frame(sort(unlist(class.output), decreasing=TRUE))
+top.c <- rownames(what)[1:17] # these are the most abundant 17 classes, each > 1% relabund
+sum(what[1:17,1]) # 78% of reads are from these top 17 classes
+sum(what[1:10,1]) # 68% of reads are from these top 10 classes
+
 ps4.ra.top.c <- subset_taxa(ps4.ra, Class=="Deltaproteobacteria" | Class=="Gammaproteobacteria" | Class=="Anaerolineae" | Class=="Alphaproteobacteria" | Class==  "Ignavibacteria" | Class=="Nitrospira" | Class=="Thermodesulfovibrionia" | Class=="Bacteroidia" | Class=="Campylobacteria" | Class=="Phycisphaerae") # top classes. just setting Class==top.c doesn't work and eliminates a lot of ASVs for a reason I don't understand
 
 # testing a few bar plots before moving to the final one:
