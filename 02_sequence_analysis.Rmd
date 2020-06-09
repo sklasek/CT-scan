@@ -271,6 +271,9 @@ gg.ord.final
 ## 4) To follow up on the ordinations, do some tests for significance
 
 ```{r}
+# 1) North and South are different, but Scanned/Unscanned are not. Do this for ALL and PAIRED
+
+# 2) Within North and South sites separately, positions are different Do this for ALL and PAIRED
 
 ```
 
@@ -302,36 +305,30 @@ de.results.table.paired.unscan <- table.from.deseq(deseq = de.paired.scan, relab
 # combine and merge these two tables for graphing
 de.results.table.paired.scan$treatment <- "Scanned"
 de.results.table.paired.unscan$treatment <- "Unscanned"
-de.results.table.paired.scan$asv <- rownames(de.results.table.paired.scan)
+de.results.table.paired.scan$asv <- rownames(de.results.table.paired.scan) # put ASV names as separate columns
 de.results.table.paired.unscan$asv <- rownames(de.results.table.paired.unscan)
-df.biom.scan <- rbind(as(de.results.table.paired.scan, "data.frame"), as(de.results.table.paired.unscan, "data.frame")) # merge (careful, now the rownames are lies)
+de.results.table.paired.scan$asvorder <- factor(de.results.table.paired.scan$asv, levels = de.results.table.paired.scan$asv[order(de.results.table.paired.scan$relabund)]) # sort by descending order of relative abundance
+de.results.table.paired.unscan$asvorder <- factor(de.results.table.paired.unscan$asv, levels = de.results.table.paired.unscan$asv[order(de.results.table.paired.unscan$relabund)])
+# merge (careful, now the rownames are lies)
+df.biom.scan <- rbind(as(de.results.table.paired.scan, "data.frame"), as(de.results.table.paired.unscan, "data.frame")) 
 
-# instead of genus name, write the most specific taxonomic category to label biomarkers with
+# Instead of genus name, write the most specific taxonomic category to label biomarkers with:
 specific.taxon <- c(NA, "Cl. Thermodesulfovibrionia", "Cl. Gammaproteobacteria", NA, "Fam. Desulfobulbaceae", "Gen. Ignavibacterium", "Gen. Ignavibacterium", "SEEP-SRB1", "SEEP-SRB1", "Gen. Amphritea", "Gen. Thiohalophilus", "SB-5", "Gen. Desulfatitalea")
 df.biom.scan$tax.label <- rep(specific.taxon, times=2)
 
-df.biom.scan
+# Graph biomarkers
+gg.biom.scan <- ggplot(df.biom.scan, aes(x=asvorder, y=100*relabund, fill=Phylum)) + 
+  geom_bar(stat="identity") + 
+  geom_text(aes(label=tax.label), hjust="left", size=3) +
+  scale_fill_brewer(palette = "Set2") +
+  scale_y_continuous("Percent abundance of total community", limits = c(0,1)) +
+  scale_x_discrete("") +
+  coord_flip() +
+  facet_grid(~treatment, scales = "free", space="free") +
+  ggtitle("") +
+  theme_bw() +
+  theme(strip.text = element_text(size = 11))
 
-df.biom.scan$asvorder <- factor(df.biom.scan$asv, levels = df.biom.scan$asv[order(df.biom.scan$relabund)]) # order by relative abundance does not work because we have duplicate rows with the same asv. should we sort by relabund of the scanned samples, or the unscanned ones? 
-
-
-
+gg.biom.scan
 ```
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
