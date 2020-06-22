@@ -25,7 +25,7 @@ ps4 <- readRDS(file = "ps4")
 
 ## 1) Bar plots showing high-level (class) community composition of all samples: 
 
-```{r}
+```{r, barplot, fig.height=3, fig.width=5}
 ps4.ra <- transform_sample_counts(ps4, function(OTU) OTU/sum(OTU)) # transform read counts to relative abundances
 
 # graph sequences belonging to most abundant classes (as done with the OTU dataset) 
@@ -109,7 +109,7 @@ barplot
 
 ## 2) Alpha diversity analysis of all samples
 
-```{r}
+```{r, alpha diversity supplemental figure, fig.height=1.5, fig.width=5}
 paircode <- read.csv(file="paircode.csv") # import the file showing which samples are paired with one another
 sample_data(ps4) <- data.frame(sample_data(ps4), paircode) # add this info to the ps object
 
@@ -119,40 +119,61 @@ alphadiv <- estimate_richness(ps4, measures = c("Observed", "Shannon")) # calcul
 alphadiv <- data.frame(alphadiv, sample_data(ps4)) # write metadata into an alpha diversity data frame
 
 # Is there a difference in alpha diversity between scanned and unscanned samples?
-t.test(alphadiv[which(alphadiv$scan=="Unscanned"),]$Observed, alphadiv[which(alphadiv$scan=="Scanned"),]$Observed) # observed richness, no
-t.test(alphadiv[which(alphadiv$scan=="Unscanned"),]$Shannon, alphadiv[which(alphadiv$scan=="Scanned"),]$Shannon) # shannon, no
+# t.test(alphadiv[which(alphadiv$scan=="Unscanned"),]$Observed, alphadiv[which(alphadiv$scan=="Scanned"),]$Observed) # observed richness, no
+# t.test(alphadiv[which(alphadiv$scan=="Unscanned"),]$Shannon, alphadiv[which(alphadiv$scan=="Scanned"),]$Shannon) # shannon, no
 
 # Alpha diversity should be analyzed by pairing scanned/unscanned samples:
 df.ps4 <- data.frame(sample_data(ps4), alphadiv[,1:3]) # combine sample data and alpha diversity into a df
 df.ps4.p <- df.ps4 %>% filter(is.paired=="y") # filter only the paired samples
 df.ps4.p <- df.ps4.p[order(df.ps4.p$paircode),] # order the dataframe by their paircode
-t.test(df.ps4.p[which(df.ps4.p$scan=="Unscanned"),]$Observed, df.ps4.p[which(df.ps4.p$scan=="Scanned"),]$Observed, paired = TRUE) # t = -1.686, df = 10, p-value = 0.1227
-t.test(df.ps4.p[which(df.ps4.p$scan=="Unscanned"),]$Shannon, df.ps4.p[which(df.ps4.p$scan=="Scanned"),]$Shannon, paired = TRUE) # t = -2.0386, df = 10, p-value = 0.06881
+# t.test(df.ps4.p[which(df.ps4.p$scan=="Unscanned"),]$Observed, df.ps4.p[which(df.ps4.p$scan=="Scanned"),]$Observed, paired = TRUE) # t = -1.686, df = 10, p-value = 0.1227
+# t.test(df.ps4.p[which(df.ps4.p$scan=="Unscanned"),]$Shannon, df.ps4.p[which(df.ps4.p$scan=="Scanned"),]$Shannon, paired = TRUE) # t = -2.0386, df = 10, p-value = 0.06881
+
+alphadiv$storage_days <- as.numeric(alphadiv$storage_days) # convert to numeric
 
 # plot alpha diversity over time
-gg.alphadiv.obs <- ggplot(alphadiv, aes(storage_days, Observed))+
+gg.alphadiv.obs <- ggplot(alphadiv, aes(storage_days, Observed, color=depth_cm))+
   geom_point()+
-  facet_grid(~site)
-gg.alphadiv.obs # no huge changes in observed ASV richness
+  geom_smooth(method = "lm", linetype="dashed", color="black")+
+  scale_x_continuous("Days stored")+
+  scale_color_gradient("Depth (cm)")+
+  facet_grid(~site)+
+  theme_bw()+
+  guides(fill = guide_legend(reverse = TRUE))
 
-gg.alphadiv.sha <- ggplot(alphadiv, aes(storage_days, Shannon))+
+gg.alphadiv.sha <- ggplot(alphadiv, aes(storage_days, Shannon, color=depth_cm))+
   geom_point()+
-  facet_grid(~site)
-gg.alphadiv.sha # no huge changes in Shannon diversity over time
+  geom_smooth(method = "lm", linetype="dashed", color="black")+
+  scale_x_continuous("Days stored")+
+  scale_color_gradient("Depth (cm)")+
+  facet_grid(~site)+
+  theme_bw()
+
+# regression of alpha diversity over storage time
+alphadiv.north <- alphadiv %>% filter(site=="North")
+alphadiv.south<- alphadiv %>% filter(site=="South")
+
+summary(lm(alphadiv.north$Shannon ~ alphadiv.north$storage_days)) # linear model (Shannon diversity index, north site) p=0.205 
+summary(lm(alphadiv.south$Shannon ~ alphadiv.south$storage_days)) # linear model (Shannon diversity index, south site) p=0.437 
+summary(lm(alphadiv.north$Observed ~ alphadiv.north$storage_days)) # linear model (Observed diversity index, north site) p=0.153
+summary(lm(alphadiv.south$Observed ~ alphadiv.south$storage_days)) # linear model (Observed diversity index, south site) p=0.87629  
+
+# plot alpha diversity
+gg.alphadiv.obs + gg.alphadiv.sha + plot_layout(guides="collect") # no huge changes in observed ASV richness or Shannon diversity over time
 
 # alpha diversity by site (north/south)
-t.test(alphadiv[which(alphadiv$site=="North"),]$Observed, alphadiv[which(alphadiv$site=="South"),]$Observed) # not in observed richness
-t.test(alphadiv[which(alphadiv$site=="North"),]$Shannon, alphadiv[which(alphadiv$site=="South"),]$Shannon) # not in Shannon
+# t.test(alphadiv[which(alphadiv$site=="North"),]$Observed, alphadiv[which(alphadiv$site=="South"),]$Observed) # not in observed richness
+# t.test(alphadiv[which(alphadiv$site=="North"),]$Shannon, alphadiv[which(alphadiv$site=="South"),]$Shannon) # not in Shannon
 
 # alpha diversity by tsunami layer
-t.test(alphadiv[which(alphadiv$sedtype=="Estuary Sediment"),]$Observed, alphadiv[which(alphadiv$sedtype=="Tsunami Deposit"),]$Observed) # not in observed richness
-t.test(alphadiv[which(alphadiv$sedtype=="Estuary Sediment"),]$Shannon, alphadiv[which(alphadiv$sedtype=="Tsunami Deposit"),]$Shannon) # not in Shannon
+# t.test(alphadiv[which(alphadiv$sedtype=="Estuary Sediment"),]$Observed, alphadiv[which(alphadiv$sedtype=="Tsunami Deposit"),]$Observed) # not in observed richness
+# t.test(alphadiv[which(alphadiv$sedtype=="Estuary Sediment"),]$Shannon, alphadiv[which(alphadiv$sedtype=="Tsunami Deposit"),]$Shannon) # not in Shannon
 ```
 
 
 ## 3) Normalizations and ordinations
 
-```{r}
+```{r, ordination figure, fig.height=1.5, fig.width=5}
 ## First, transform data, try Hellinger transformation
 otu_table(ps4)[1:5,1:5]
 otu.ps4.hell <- otu_table(decostand(otu_table(ps4), method = "hellinger"), taxa_are_rows=FALSE)
@@ -182,7 +203,9 @@ ps4.css <- phyloseq(tax_table(ps4),
 dm.ps4.hel.jac <- phyloseq::distance(ps4.hel, method = "jaccard", binary = TRUE) 
 dm.ps4.css.jac <- phyloseq::distance(ps4.css, method = "jaccard", binary = TRUE)
 # weighted unifrac here
+set.seed(1)
 dm.ps4.hel.wu <- phyloseq::distance(ps4.hel, method = "wunifrac") 
+set.seed(1)
 dm.ps4.css.wu <- phyloseq::distance(ps4.css, method = "wunifrac")
 
 ## Make ordinations
@@ -218,7 +241,9 @@ sample_data(ps4.css.south)$position <- ifelse(sample_data(ps4.css.south)$sedtype
   ifelse(sample_data(ps4.css.south)$sedtype=="Estuary Sediment" & sample_data(ps4.css.south)$depth_cm > 70, "Below", NA)))
 
 # Ordinate North/South separately, and label by above/within/below deposit (or sedtype) and add label=depth_cm. Maybe also storage time?
+set.seed(1)
 dm.ps4.css.north.wu <- phyloseq::distance(ps4.css.north, method = "wunifrac")
+set.seed(1)
 dm.ps4.css.south.wu <- phyloseq::distance(ps4.css.south, method = "wunifrac")
 ord.ps4.css.north.pcoa.wu <- ordinate(ps4.css.north, method="PCoA", distance=dm.ps4.css.north.wu)
 ord.ps4.css.south.pcoa.wu <- ordinate(ps4.css.south, method="PCoA", distance=dm.ps4.css.south.wu)
@@ -237,18 +262,18 @@ ord9 <- plot_ordination(ps4.css.south, ord.ps4.css.south.pcoa.wu, color="storage
 ord10 <- plot_ordination(ps4.css.north, ord.ps4.css.north.pcoa.wu, color="position") +
   geom_point(size=2) +
   stat_ellipse() +
-  geom_text(aes(label=depth_cm), size=3, color="black", nudge_x = 0.01, nudge_y = 0.01) +
+  geom_text(aes(label=depth_cm), size=3, color="black", nudge_x = 0.015, nudge_y = 0.012) +
   ggtitle("B") +
-  geom_text(aes(label="North Site"), color="black", x=0.1, y=0.15, show.legend = FALSE) +
+  geom_text(aes(label="North Site"), color="black", x=0.1, y=0.16, show.legend = FALSE) +
   theme_bw() +
   theme(legend.position = "none")
 ord11 <- plot_ordination(ps4.css.south, ord.ps4.css.south.pcoa.wu, color="position") +
   geom_point(size=2) +
   stat_ellipse() +
-  geom_text(aes(label=depth_cm), size=3, color="black", nudge_x = 0.01, nudge_y = 0.01) +
+  geom_text(aes(label=depth_cm), size=3, color="black", nudge_x = 0.015, nudge_y = 0.015) +
   scale_color_discrete("Position relative to \nTsunami Layer") +
   ggtitle("C") +
-  geom_text(aes(label="South Site"), color="black", x=-0.13, y=0.15, show.legend = FALSE) +
+  geom_text(aes(label="South Site"), color="black", x=-0.13, y=0.17, show.legend = FALSE) +
   theme_bw()
 
 # final ordination plots
@@ -259,14 +284,19 @@ gg.ord.all <- plot_ordination(ps4.css, ord.ps4.css.pcoa.wu, color="scan", shape=
   ggtitle("A") +
   geom_text(aes(label="Both Sites"), color="black", x=-0.1, y=0.2, show.legend = FALSE) +
   theme_bw() # PCoA weighted unifrac, CSS
-gg.ord.all
-
-gg.ord.storage <- ord8 + ord9 + plot_layout(guides="collect")
-gg.ord.storage
 
 gg.ord.final <- gg.ord.all + ord10 + ord11
 gg.ord.final
 ```
+
+Use different dimensions for supplemental figure (ordination of communities colored by storage time)
+
+```{r, ordination-storage, fig.height=1.5, fig.width=3.5}
+gg.ord.storage <- ord8 + ord9 + plot_layout(guides="collect")
+gg.ord.storage
+```
+
+
 
 ## 4) To follow up on the ordinations, do some tests for significance
 
@@ -276,7 +306,9 @@ df.ps4.css <- as(sample_data(ps4.css), "data.frame") # make data frames for ps o
 df.ps4.hel <- as(sample_data(ps4.hel), "data.frame")
 ps4.css.p <- subset_samples(ps4.css, is.paired=="y") # subset only paired samples
 df.ps4.css.p <- as(sample_data(ps4.css.p), "data.frame") 
+```
 
+```{r eval=FALSE}
 # CT scanning makes little difference (unpaired first), transformation type doesn't really matter, distance metric does
 adonis(phyloseq::distance(ps4.css, method="jaccard") ~ scan, data = df.ps4.css) # scan explains 2.4% of community, p=0.36
 adonis(phyloseq::distance(ps4.css, method="bray") ~ scan, data = df.ps4.css) # scan explains 2.1% of community, p=0.45
@@ -334,7 +366,7 @@ adonis(phyloseq::distance(ps4.css.south, method="wunifrac") ~ sedtype, data = df
 
 ## 5) Biomarker detection between scanned/unscanned samples with DESeq2
 
-```{r}
+```{r, biomarkers, fig.height=2.5, fig.width=4}
 ps4.p <- subset_samples(ps4, is.paired="y") # only use the paired samples when looking for biomarkers
 ps4.p.ra <- transform_sample_counts(ps4.p, function(OTU) OTU/sum(OTU)) # convert paired phyloseq object into relative abundances for deseq function
 de.paired.scan <- phyloseq_to_deseq2(ps4.p, ~ scan) # convert phyloseq object into a deseq object

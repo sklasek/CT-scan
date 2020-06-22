@@ -244,13 +244,13 @@ top.c <- rownames(what)[1:17] # these are the most abundant 17 classes, each > 1
 sum(what[1:17,1]) # 78% of reads are from these top 17 classes
 ```
 
-    ## [1] 0.7789612
+    ## [1] 0.7785883
 
 ``` r
 sum(what[1:10,1]) # 68% of reads are from these top 10 classes
 ```
 
-    ## [1] 0.684135
+    ## [1] 0.6835378
 
 ``` r
 ps4.ra.top.c <- subset_taxa(ps4.ra, Class=="Deltaproteobacteria" | Class=="Gammaproteobacteria" | Class=="Anaerolineae" | Class=="Alphaproteobacteria" | Class==  "Ignavibacteria" | Class=="Nitrospira" | Class=="Thermodesulfovibrionia" | Class=="Bacteroidia" | Class=="Campylobacteria" | Class=="Phycisphaerae") # top classes. just setting Class==top.c doesn't work and eliminates a lot of ASVs for a reason I don't understand
@@ -320,7 +320,7 @@ barplot <- (gg.bar.top.c.north.s + gg.bar.top.c.north.u) / (gg.bar.top.c.south.s
 barplot
 ```
 
-![](02_sequence_analysis_files/figure-gfm/unnamed-chunk-1-1.png)<!-- -->
+![](02_sequence_analysis_files/figure-gfm/barplot-1.png)<!-- -->
 
 ## 2\) Alpha diversity analysis of all samples
 
@@ -338,7 +338,7 @@ plot_richness(ps4, x="scan", measures = c("Observed", "Shannon")) # simple plot
     ## 
     ## We recommended that you find the un-trimmed data and retry.
 
-![](02_sequence_analysis_files/figure-gfm/unnamed-chunk-2-1.png)<!-- -->
+![](02_sequence_analysis_files/figure-gfm/alpha%20diversity%20supplemental%20figure-1.png)<!-- -->
 
 ``` r
 alphadiv <- estimate_richness(ps4, measures = c("Observed", "Shannon")) # calculate alpha diversity
@@ -355,157 +355,147 @@ alphadiv <- estimate_richness(ps4, measures = c("Observed", "Shannon")) # calcul
 alphadiv <- data.frame(alphadiv, sample_data(ps4)) # write metadata into an alpha diversity data frame
 
 # Is there a difference in alpha diversity between scanned and unscanned samples?
-t.test(alphadiv[which(alphadiv$scan=="Unscanned"),]$Observed, alphadiv[which(alphadiv$scan=="Scanned"),]$Observed) # observed richness, no
-```
+# t.test(alphadiv[which(alphadiv$scan=="Unscanned"),]$Observed, alphadiv[which(alphadiv$scan=="Scanned"),]$Observed) # observed richness, no
+# t.test(alphadiv[which(alphadiv$scan=="Unscanned"),]$Shannon, alphadiv[which(alphadiv$scan=="Scanned"),]$Shannon) # shannon, no
 
-    ## 
-    ##  Welch Two Sample t-test
-    ## 
-    ## data:  alphadiv[which(alphadiv$scan == "Unscanned"), ]$Observed and alphadiv[which(alphadiv$scan == "Scanned"), ]$Observed
-    ## t = -1.1626, df = 22.093, p-value = 0.2574
-    ## alternative hypothesis: true difference in means is not equal to 0
-    ## 95 percent confidence interval:
-    ##  -297.8645   83.8340
-    ## sample estimates:
-    ## mean of x mean of y 
-    ##  351.9259  458.9412
-
-``` r
-t.test(alphadiv[which(alphadiv$scan=="Unscanned"),]$Shannon, alphadiv[which(alphadiv$scan=="Scanned"),]$Shannon) # shannon, no
-```
-
-    ## 
-    ##  Welch Two Sample t-test
-    ## 
-    ## data:  alphadiv[which(alphadiv$scan == "Unscanned"), ]$Shannon and alphadiv[which(alphadiv$scan == "Scanned"), ]$Shannon
-    ## t = -1.6881, df = 31.076, p-value = 0.1014
-    ## alternative hypothesis: true difference in means is not equal to 0
-    ## 95 percent confidence interval:
-    ##  -0.67204865  0.06332039
-    ## sample estimates:
-    ## mean of x mean of y 
-    ##  4.680593  4.984957
-
-``` r
 # Alpha diversity should be analyzed by pairing scanned/unscanned samples:
 df.ps4 <- data.frame(sample_data(ps4), alphadiv[,1:3]) # combine sample data and alpha diversity into a df
 df.ps4.p <- df.ps4 %>% filter(is.paired=="y") # filter only the paired samples
 df.ps4.p <- df.ps4.p[order(df.ps4.p$paircode),] # order the dataframe by their paircode
-t.test(df.ps4.p[which(df.ps4.p$scan=="Unscanned"),]$Observed, df.ps4.p[which(df.ps4.p$scan=="Scanned"),]$Observed, paired = TRUE) # t = -1.686, df = 10, p-value = 0.1227
-```
+# t.test(df.ps4.p[which(df.ps4.p$scan=="Unscanned"),]$Observed, df.ps4.p[which(df.ps4.p$scan=="Scanned"),]$Observed, paired = TRUE) # t = -1.686, df = 10, p-value = 0.1227
+# t.test(df.ps4.p[which(df.ps4.p$scan=="Unscanned"),]$Shannon, df.ps4.p[which(df.ps4.p$scan=="Scanned"),]$Shannon, paired = TRUE) # t = -2.0386, df = 10, p-value = 0.06881
 
-    ## 
-    ##  Paired t-test
-    ## 
-    ## data:  df.ps4.p[which(df.ps4.p$scan == "Unscanned"), ]$Observed and df.ps4.p[which(df.ps4.p$scan == "Scanned"), ]$Observed
-    ## t = -1.686, df = 10, p-value = 0.1227
-    ## alternative hypothesis: true difference in means is not equal to 0
-    ## 95 percent confidence interval:
-    ##  -387.48920   53.67102
-    ## sample estimates:
-    ## mean of the differences 
-    ##               -166.9091
+alphadiv$storage_days <- as.numeric(alphadiv$storage_days) # convert to numeric
 
-``` r
-t.test(df.ps4.p[which(df.ps4.p$scan=="Unscanned"),]$Shannon, df.ps4.p[which(df.ps4.p$scan=="Scanned"),]$Shannon, paired = TRUE) # t = -2.0386, df = 10, p-value = 0.06881
-```
-
-    ## 
-    ##  Paired t-test
-    ## 
-    ## data:  df.ps4.p[which(df.ps4.p$scan == "Unscanned"), ]$Shannon and df.ps4.p[which(df.ps4.p$scan == "Scanned"), ]$Shannon
-    ## t = -2.0386, df = 10, p-value = 0.06881
-    ## alternative hypothesis: true difference in means is not equal to 0
-    ## 95 percent confidence interval:
-    ##  -0.94138093  0.04182299
-    ## sample estimates:
-    ## mean of the differences 
-    ##               -0.449779
-
-``` r
 # plot alpha diversity over time
-gg.alphadiv.obs <- ggplot(alphadiv, aes(storage_days, Observed))+
+gg.alphadiv.obs <- ggplot(alphadiv, aes(storage_days, Observed, color=depth_cm))+
   geom_point()+
-  facet_grid(~site)
-gg.alphadiv.obs # no huge changes in observed ASV richness
+  geom_smooth(method = "lm", linetype="dashed", color="black")+
+  scale_x_continuous("Days stored")+
+  scale_color_gradient("Depth (cm)")+
+  facet_grid(~site)+
+  theme_bw()+
+  guides(fill = guide_legend(reverse = TRUE))
+
+gg.alphadiv.sha <- ggplot(alphadiv, aes(storage_days, Shannon, color=depth_cm))+
+  geom_point()+
+  geom_smooth(method = "lm", linetype="dashed", color="black")+
+  scale_x_continuous("Days stored")+
+  scale_color_gradient("Depth (cm)")+
+  facet_grid(~site)+
+  theme_bw()
+
+# regression of alpha diversity over storage time
+alphadiv.north <- alphadiv %>% filter(site=="North")
+alphadiv.south<- alphadiv %>% filter(site=="South")
+
+summary(lm(alphadiv.north$Shannon ~ alphadiv.north$storage_days)) # linear model (Shannon diversity index, north site) p=0.205 
 ```
 
-![](02_sequence_analysis_files/figure-gfm/unnamed-chunk-2-2.png)<!-- -->
+    ## 
+    ## Call:
+    ## lm(formula = alphadiv.north$Shannon ~ alphadiv.north$storage_days)
+    ## 
+    ## Residuals:
+    ##     Min      1Q  Median      3Q     Max 
+    ## -0.9816 -0.3715 -0.1882  0.2867  1.2103 
+    ## 
+    ## Coefficients:
+    ##                             Estimate Std. Error t value Pr(>|t|)    
+    ## (Intercept)                  4.92903    0.18359  26.848   <2e-16 ***
+    ## alphadiv.north$storage_days -0.01771    0.01354  -1.308    0.205    
+    ## ---
+    ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+    ## 
+    ## Residual standard error: 0.5721 on 21 degrees of freedom
+    ## Multiple R-squared:  0.07532,    Adjusted R-squared:  0.03129 
+    ## F-statistic: 1.711 on 1 and 21 DF,  p-value: 0.205
 
 ``` r
-gg.alphadiv.sha <- ggplot(alphadiv, aes(storage_days, Shannon))+
-  geom_point()+
-  facet_grid(~site)
-gg.alphadiv.sha # no huge changes in Shannon diversity over time
+summary(lm(alphadiv.south$Shannon ~ alphadiv.south$storage_days)) # linear model (Shannon diversity index, south site) p=0.437 
 ```
 
-![](02_sequence_analysis_files/figure-gfm/unnamed-chunk-2-3.png)<!-- -->
+    ## 
+    ## Call:
+    ## lm(formula = alphadiv.south$Shannon ~ alphadiv.south$storage_days)
+    ## 
+    ## Residuals:
+    ##      Min       1Q   Median       3Q      Max 
+    ## -0.87614 -0.44086 -0.03745  0.27780  1.13250 
+    ## 
+    ## Coefficients:
+    ##                             Estimate Std. Error t value Pr(>|t|)    
+    ## (Intercept)                  4.98734    0.21063  23.678 1.45e-15 ***
+    ## alphadiv.south$storage_days -0.01213    0.01533  -0.791    0.438    
+    ## ---
+    ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+    ## 
+    ## Residual standard error: 0.5917 on 19 degrees of freedom
+    ## Multiple R-squared:  0.03192,    Adjusted R-squared:  -0.01903 
+    ## F-statistic: 0.6265 on 1 and 19 DF,  p-value: 0.4384
+
+``` r
+summary(lm(alphadiv.north$Observed ~ alphadiv.north$storage_days)) # linear model (Observed diversity index, north site) p=0.153
+```
+
+    ## 
+    ## Call:
+    ## lm(formula = alphadiv.north$Observed ~ alphadiv.north$storage_days)
+    ## 
+    ## Residuals:
+    ##     Min      1Q  Median      3Q     Max 
+    ## -269.80 -128.85  -92.19   79.44  572.20 
+    ## 
+    ## Coefficients:
+    ##                             Estimate Std. Error t value Pr(>|t|)    
+    ## (Intercept)                  448.642     71.811   6.248 3.39e-06 ***
+    ## alphadiv.north$storage_days   -7.839      5.297  -1.480    0.154    
+    ## ---
+    ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+    ## 
+    ## Residual standard error: 223.8 on 21 degrees of freedom
+    ## Multiple R-squared:  0.09443,    Adjusted R-squared:  0.05131 
+    ## F-statistic:  2.19 on 1 and 21 DF,  p-value: 0.1538
+
+``` r
+summary(lm(alphadiv.south$Observed ~ alphadiv.south$storage_days)) # linear model (Observed diversity index, south site) p=0.87629  
+```
+
+    ## 
+    ## Call:
+    ## lm(formula = alphadiv.south$Observed ~ alphadiv.south$storage_days)
+    ## 
+    ## Residuals:
+    ##     Min      1Q  Median      3Q     Max 
+    ## -250.71 -185.09 -132.95   86.29 1004.53 
+    ## 
+    ## Coefficients:
+    ##                             Estimate Std. Error t value Pr(>|t|)    
+    ## (Intercept)                  434.947    109.706   3.965 0.000831 ***
+    ## alphadiv.south$storage_days   -1.232      7.983  -0.154 0.878984    
+    ## ---
+    ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+    ## 
+    ## Residual standard error: 308.2 on 19 degrees of freedom
+    ## Multiple R-squared:  0.001252,   Adjusted R-squared:  -0.05131 
+    ## F-statistic: 0.02382 on 1 and 19 DF,  p-value: 0.879
+
+``` r
+# plot alpha diversity
+gg.alphadiv.obs + gg.alphadiv.sha + plot_layout(guides="collect") # no huge changes in observed ASV richness or Shannon diversity over time
+```
+
+![](02_sequence_analysis_files/figure-gfm/alpha%20diversity%20supplemental%20figure-2.png)<!-- -->
 
 ``` r
 # alpha diversity by site (north/south)
-t.test(alphadiv[which(alphadiv$site=="North"),]$Observed, alphadiv[which(alphadiv$site=="South"),]$Observed) # not in observed richness
-```
+# t.test(alphadiv[which(alphadiv$site=="North"),]$Observed, alphadiv[which(alphadiv$site=="South"),]$Observed) # not in observed richness
+# t.test(alphadiv[which(alphadiv$site=="North"),]$Shannon, alphadiv[which(alphadiv$site=="South"),]$Shannon) # not in Shannon
 
-    ## 
-    ##  Welch Two Sample t-test
-    ## 
-    ## data:  alphadiv[which(alphadiv$site == "North"), ]$Observed and alphadiv[which(alphadiv$site == "South"), ]$Observed
-    ## t = -0.65526, df = 37.392, p-value = 0.5163
-    ## alternative hypothesis: true difference in means is not equal to 0
-    ## 95 percent confidence interval:
-    ##  -217.7522  111.3009
-    ## sample estimates:
-    ## mean of x mean of y 
-    ##  367.8696  421.0952
-
-``` r
-t.test(alphadiv[which(alphadiv$site=="North"),]$Shannon, alphadiv[which(alphadiv$site=="South"),]$Shannon) # not in Shannon
-```
-
-    ## 
-    ##  Welch Two Sample t-test
-    ## 
-    ## data:  alphadiv[which(alphadiv$site == "North"), ]$Shannon and alphadiv[which(alphadiv$site == "South"), ]$Shannon
-    ## t = -0.61475, df = 41.573, p-value = 0.5421
-    ## alternative hypothesis: true difference in means is not equal to 0
-    ## 95 percent confidence interval:
-    ##  -0.4641003  0.2474209
-    ## sample estimates:
-    ## mean of x mean of y 
-    ##   4.74648   4.85482
-
-``` r
 # alpha diversity by tsunami layer
-t.test(alphadiv[which(alphadiv$sedtype=="Estuary Sediment"),]$Observed, alphadiv[which(alphadiv$sedtype=="Tsunami Deposit"),]$Observed) # not in observed richness
+# t.test(alphadiv[which(alphadiv$sedtype=="Estuary Sediment"),]$Observed, alphadiv[which(alphadiv$sedtype=="Tsunami Deposit"),]$Observed) # not in observed richness
+# t.test(alphadiv[which(alphadiv$sedtype=="Estuary Sediment"),]$Shannon, alphadiv[which(alphadiv$sedtype=="Tsunami Deposit"),]$Shannon) # not in Shannon
 ```
-
-    ## 
-    ##  Welch Two Sample t-test
-    ## 
-    ## data:  alphadiv[which(alphadiv$sedtype == "Estuary Sediment"), ]$Observed and alphadiv[which(alphadiv$sedtype == "Tsunami Deposit"), ]$Observed
-    ## t = -0.10512, df = 37.972, p-value = 0.9168
-    ## alternative hypothesis: true difference in means is not equal to 0
-    ## 95 percent confidence interval:
-    ##  -166.4104  149.9818
-    ## sample estimates:
-    ## mean of x mean of y 
-    ##  390.2857  398.5000
-
-``` r
-t.test(alphadiv[which(alphadiv$sedtype=="Estuary Sediment"),]$Shannon, alphadiv[which(alphadiv$sedtype=="Tsunami Deposit"),]$Shannon) # not in Shannon
-```
-
-    ## 
-    ##  Welch Two Sample t-test
-    ## 
-    ## data:  alphadiv[which(alphadiv$sedtype == "Estuary Sediment"), ]$Shannon and alphadiv[which(alphadiv$sedtype == "Tsunami Deposit"), ]$Shannon
-    ## t = -0.50591, df = 36.266, p-value = 0.616
-    ## alternative hypothesis: true difference in means is not equal to 0
-    ## 95 percent confidence interval:
-    ##  -0.4412152  0.2650028
-    ## sample estimates:
-    ## mean of x mean of y 
-    ##  4.766149  4.854255
 
 ## 3\) Normalizations and ordinations
 
@@ -551,55 +541,57 @@ ps4.css <- phyloseq(tax_table(ps4),
 dm.ps4.hel.jac <- phyloseq::distance(ps4.hel, method = "jaccard", binary = TRUE) 
 dm.ps4.css.jac <- phyloseq::distance(ps4.css, method = "jaccard", binary = TRUE)
 # weighted unifrac here
+set.seed(1)
 dm.ps4.hel.wu <- phyloseq::distance(ps4.hel, method = "wunifrac") 
 ```
 
     ## Warning in UniFrac(physeq, weighted = TRUE, ...): Randomly assigning root as --
-    ## ASV6068 -- in the phylogenetic tree in the data you provided.
+    ## ASV1033 -- in the phylogenetic tree in the data you provided.
 
 ``` r
+set.seed(1)
 dm.ps4.css.wu <- phyloseq::distance(ps4.css, method = "wunifrac")
 ```
 
     ## Warning in UniFrac(physeq, weighted = TRUE, ...): Randomly assigning root as --
-    ## ASV2415 -- in the phylogenetic tree in the data you provided.
+    ## ASV1033 -- in the phylogenetic tree in the data you provided.
 
 ``` r
 ## Make ordinations
 ord.ps4.hel.nmds.bc <- ordinate(ps4.hel, "NMDS", "bray") # no need to specify a distance matrix with bray-curtis
 ```
 
-    ## Run 0 stress 0.06768539 
-    ## Run 1 stress 0.06888203 
-    ## Run 2 stress 0.06993924 
-    ## Run 3 stress 0.07199363 
-    ## Run 4 stress 0.07237812 
-    ## Run 5 stress 0.06774277 
-    ## ... Procrustes: rmse 0.009106492  max resid 0.04342403 
-    ## Run 6 stress 0.06782247 
-    ## ... Procrustes: rmse 0.0253962  max resid 0.1104988 
-    ## Run 7 stress 0.07407203 
-    ## Run 8 stress 0.07147604 
-    ## Run 9 stress 0.06782246 
-    ## ... Procrustes: rmse 0.02539422  max resid 0.110496 
-    ## Run 10 stress 0.0702372 
-    ## Run 11 stress 0.06765389 
+    ## Run 0 stress 0.06769088 
+    ## Run 1 stress 0.06926433 
+    ## Run 2 stress 0.06768981 
     ## ... New best solution
-    ## ... Procrustes: rmse 0.01673387  max resid 0.04351474 
-    ## Run 12 stress 0.06840146 
-    ## Run 13 stress 0.07410056 
-    ## Run 14 stress 0.06929848 
-    ## Run 15 stress 0.06948446 
-    ## Run 16 stress 0.07174986 
-    ## Run 17 stress 0.06811035 
-    ## ... Procrustes: rmse 0.02499923  max resid 0.08496357 
-    ## Run 18 stress 0.0728429 
-    ## Run 19 stress 0.06693748 
+    ## ... Procrustes: rmse 0.0001473804  max resid 0.0008179132 
+    ## ... Similar to previous best
+    ## Run 3 stress 0.07021525 
+    ## Run 4 stress 0.0713015 
+    ## Run 5 stress 0.07287518 
+    ## Run 6 stress 0.0669906 
     ## ... New best solution
-    ## ... Procrustes: rmse 0.009376923  max resid 0.0435567 
-    ## Run 20 stress 0.07154359 
-    ## *** No convergence -- monoMDS stopping criteria:
-    ##     20: stress ratio > sratmax
+    ## ... Procrustes: rmse 0.02004575  max resid 0.05184837 
+    ## Run 7 stress 0.06730799 
+    ## ... Procrustes: rmse 0.00577777  max resid 0.02991576 
+    ## Run 8 stress 0.068084 
+    ## Run 9 stress 0.06699067 
+    ## ... Procrustes: rmse 0.0001294464  max resid 0.0003986716 
+    ## ... Similar to previous best
+    ## Run 10 stress 0.06831713 
+    ## Run 11 stress 0.06756996 
+    ## Run 12 stress 0.07166644 
+    ## Run 13 stress 0.0701374 
+    ## Run 14 stress 0.06807492 
+    ## Run 15 stress 0.06730771 
+    ## ... Procrustes: rmse 0.005780223  max resid 0.02989203 
+    ## Run 16 stress 0.06956639 
+    ## Run 17 stress 0.06767315 
+    ## Run 18 stress 0.06848799 
+    ## Run 19 stress 0.06942147 
+    ## Run 20 stress 0.06848819 
+    ## *** Solution reached
 
 ``` r
 ord.ps4.css.nmds.bc <- ordinate(ps4.css, "NMDS", "bray")
@@ -607,57 +599,55 @@ ord.ps4.css.nmds.bc <- ordinate(ps4.css, "NMDS", "bray")
 
     ## Square root transformation
     ## Wisconsin double standardization
-    ## Run 0 stress 0.07470939 
-    ## Run 1 stress 0.09563959 
-    ## Run 2 stress 0.09864417 
-    ## Run 3 stress 0.07470939 
+    ## Run 0 stress 0.07451032 
+    ## Run 1 stress 0.07451032 
+    ## ... Procrustes: rmse 1.473348e-05  max resid 4.106278e-05 
+    ## ... Similar to previous best
+    ## Run 2 stress 0.07451032 
     ## ... New best solution
-    ## ... Procrustes: rmse 1.894132e-05  max resid 5.368978e-05 
+    ## ... Procrustes: rmse 1.186643e-05  max resid 3.41943e-05 
     ## ... Similar to previous best
-    ## Run 4 stress 0.07470939 
+    ## Run 3 stress 0.07451032 
+    ## ... Procrustes: rmse 4.325868e-06  max resid 1.352572e-05 
+    ## ... Similar to previous best
+    ## Run 4 stress 0.07451032 
+    ## ... Procrustes: rmse 1.365886e-05  max resid 3.821042e-05 
+    ## ... Similar to previous best
+    ## Run 5 stress 0.07451032 
+    ## ... Procrustes: rmse 1.207015e-05  max resid 3.296781e-05 
+    ## ... Similar to previous best
+    ## Run 6 stress 0.07451033 
+    ## ... Procrustes: rmse 1.123917e-05  max resid 4.34181e-05 
+    ## ... Similar to previous best
+    ## Run 7 stress 0.07451032 
+    ## ... Procrustes: rmse 2.140497e-06  max resid 1.050903e-05 
+    ## ... Similar to previous best
+    ## Run 8 stress 0.09521164 
+    ## Run 9 stress 0.09778465 
+    ## Run 10 stress 0.09778469 
+    ## Run 11 stress 0.07451033 
+    ## ... Procrustes: rmse 2.10272e-05  max resid 5.579506e-05 
+    ## ... Similar to previous best
+    ## Run 12 stress 0.09929915 
+    ## Run 13 stress 0.07451033 
+    ## ... Procrustes: rmse 1.58852e-05  max resid 4.139376e-05 
+    ## ... Similar to previous best
+    ## Run 14 stress 0.07451032 
+    ## ... Procrustes: rmse 9.620714e-06  max resid 2.630625e-05 
+    ## ... Similar to previous best
+    ## Run 15 stress 0.09448502 
+    ## Run 16 stress 0.09628974 
+    ## Run 17 stress 0.1038152 
+    ## Run 18 stress 0.07451033 
+    ## ... Procrustes: rmse 2.316238e-05  max resid 6.35912e-05 
+    ## ... Similar to previous best
+    ## Run 19 stress 0.07451032 
     ## ... New best solution
-    ## ... Procrustes: rmse 6.197696e-06  max resid 1.711052e-05 
+    ## ... Procrustes: rmse 9.270722e-06  max resid 2.573634e-05 
     ## ... Similar to previous best
-    ## Run 5 stress 0.07470939 
-    ## ... Procrustes: rmse 2.324235e-06  max resid 7.092236e-06 
+    ## Run 20 stress 0.07451034 
+    ## ... Procrustes: rmse 1.057138e-05  max resid 6.190239e-05 
     ## ... Similar to previous best
-    ## Run 6 stress 0.07470941 
-    ## ... Procrustes: rmse 2.900091e-05  max resid 8.141333e-05 
-    ## ... Similar to previous best
-    ## Run 7 stress 0.07470939 
-    ## ... Procrustes: rmse 4.525098e-06  max resid 1.307232e-05 
-    ## ... Similar to previous best
-    ## Run 8 stress 0.09462424 
-    ## Run 9 stress 0.07470939 
-    ## ... Procrustes: rmse 6.822366e-06  max resid 1.856317e-05 
-    ## ... Similar to previous best
-    ## Run 10 stress 0.07470939 
-    ## ... Procrustes: rmse 5.850912e-06  max resid 1.642495e-05 
-    ## ... Similar to previous best
-    ## Run 11 stress 0.07470939 
-    ## ... Procrustes: rmse 7.528114e-06  max resid 2.103106e-05 
-    ## ... Similar to previous best
-    ## Run 12 stress 0.07470939 
-    ## ... Procrustes: rmse 7.279485e-06  max resid 1.991369e-05 
-    ## ... Similar to previous best
-    ## Run 13 stress 0.07470939 
-    ## ... Procrustes: rmse 7.387199e-06  max resid 2.188754e-05 
-    ## ... Similar to previous best
-    ## Run 14 stress 0.07470939 
-    ## ... Procrustes: rmse 4.075647e-06  max resid 1.084853e-05 
-    ## ... Similar to previous best
-    ## Run 15 stress 0.07470939 
-    ## ... Procrustes: rmse 6.336443e-06  max resid 1.91428e-05 
-    ## ... Similar to previous best
-    ## Run 16 stress 0.09840939 
-    ## Run 17 stress 0.07470939 
-    ## ... Procrustes: rmse 2.284287e-06  max resid 7.039812e-06 
-    ## ... Similar to previous best
-    ## Run 18 stress 0.09563954 
-    ## Run 19 stress 0.07470939 
-    ## ... Procrustes: rmse 2.38977e-06  max resid 5.407341e-06 
-    ## ... Similar to previous best
-    ## Run 20 stress 0.09526265 
     ## *** Solution reached
 
 ``` r
@@ -691,18 +681,20 @@ sample_data(ps4.css.south)$position <- ifelse(sample_data(ps4.css.south)$sedtype
   ifelse(sample_data(ps4.css.south)$sedtype=="Estuary Sediment" & sample_data(ps4.css.south)$depth_cm > 70, "Below", NA)))
 
 # Ordinate North/South separately, and label by above/within/below deposit (or sedtype) and add label=depth_cm. Maybe also storage time?
+set.seed(1)
 dm.ps4.css.north.wu <- phyloseq::distance(ps4.css.north, method = "wunifrac")
 ```
 
     ## Warning in UniFrac(physeq, weighted = TRUE, ...): Randomly assigning root as --
-    ## ASV6587 -- in the phylogenetic tree in the data you provided.
+    ## ASV1033 -- in the phylogenetic tree in the data you provided.
 
 ``` r
+set.seed(1)
 dm.ps4.css.south.wu <- phyloseq::distance(ps4.css.south, method = "wunifrac")
 ```
 
     ## Warning in UniFrac(physeq, weighted = TRUE, ...): Randomly assigning root as --
-    ## ASV7148 -- in the phylogenetic tree in the data you provided.
+    ## ASV1033 -- in the phylogenetic tree in the data you provided.
 
 ``` r
 ord.ps4.css.north.pcoa.wu <- ordinate(ps4.css.north, method="PCoA", distance=dm.ps4.css.north.wu)
@@ -722,18 +714,18 @@ ord9 <- plot_ordination(ps4.css.south, ord.ps4.css.south.pcoa.wu, color="storage
 ord10 <- plot_ordination(ps4.css.north, ord.ps4.css.north.pcoa.wu, color="position") +
   geom_point(size=2) +
   stat_ellipse() +
-  geom_text(aes(label=depth_cm), size=3, color="black", nudge_x = 0.01, nudge_y = 0.01) +
+  geom_text(aes(label=depth_cm), size=3, color="black", nudge_x = 0.015, nudge_y = 0.012) +
   ggtitle("B") +
-  geom_text(aes(label="North Site"), color="black", x=0.1, y=0.15, show.legend = FALSE) +
+  geom_text(aes(label="North Site"), color="black", x=0.1, y=0.16, show.legend = FALSE) +
   theme_bw() +
   theme(legend.position = "none")
 ord11 <- plot_ordination(ps4.css.south, ord.ps4.css.south.pcoa.wu, color="position") +
   geom_point(size=2) +
   stat_ellipse() +
-  geom_text(aes(label=depth_cm), size=3, color="black", nudge_x = 0.01, nudge_y = 0.01) +
+  geom_text(aes(label=depth_cm), size=3, color="black", nudge_x = 0.015, nudge_y = 0.015) +
   scale_color_discrete("Position relative to \nTsunami Layer") +
   ggtitle("C") +
-  geom_text(aes(label="South Site"), color="black", x=-0.13, y=0.15, show.legend = FALSE) +
+  geom_text(aes(label="South Site"), color="black", x=-0.13, y=0.17, show.legend = FALSE) +
   theme_bw()
 
 # final ordination plots
@@ -744,24 +736,22 @@ gg.ord.all <- plot_ordination(ps4.css, ord.ps4.css.pcoa.wu, color="scan", shape=
   ggtitle("A") +
   geom_text(aes(label="Both Sites"), color="black", x=-0.1, y=0.2, show.legend = FALSE) +
   theme_bw() # PCoA weighted unifrac, CSS
-gg.ord.all
+
+gg.ord.final <- gg.ord.all + ord10 + ord11
+gg.ord.final
 ```
 
-![](02_sequence_analysis_files/figure-gfm/unnamed-chunk-3-1.png)<!-- -->
+![](02_sequence_analysis_files/figure-gfm/ordination%20figure-1.png)<!-- -->
+
+Use different dimensions for supplemental figure (ordination of
+communities colored by storage time)
 
 ``` r
 gg.ord.storage <- ord8 + ord9 + plot_layout(guides="collect")
 gg.ord.storage
 ```
 
-![](02_sequence_analysis_files/figure-gfm/unnamed-chunk-3-2.png)<!-- -->
-
-``` r
-gg.ord.final <- gg.ord.all + ord10 + ord11
-gg.ord.final
-```
-
-![](02_sequence_analysis_files/figure-gfm/unnamed-chunk-3-3.png)<!-- -->
+![](02_sequence_analysis_files/figure-gfm/ordination-storage-1.png)<!-- -->
 
 ## 4\) To follow up on the ordinations, do some tests for significance
 
@@ -771,308 +761,28 @@ df.ps4.css <- as(sample_data(ps4.css), "data.frame") # make data frames for ps o
 df.ps4.hel <- as(sample_data(ps4.hel), "data.frame")
 ps4.css.p <- subset_samples(ps4.css, is.paired=="y") # subset only paired samples
 df.ps4.css.p <- as(sample_data(ps4.css.p), "data.frame") 
+```
 
+``` r
 # CT scanning makes little difference (unpaired first), transformation type doesn't really matter, distance metric does
 adonis(phyloseq::distance(ps4.css, method="jaccard") ~ scan, data = df.ps4.css) # scan explains 2.4% of community, p=0.36
-```
-
-    ## 
-    ## Call:
-    ## adonis(formula = phyloseq::distance(ps4.css, method = "jaccard") ~      scan, data = df.ps4.css) 
-    ## 
-    ## Permutation: free
-    ## Number of permutations: 999
-    ## 
-    ## Terms added sequentially (first to last)
-    ## 
-    ##           Df SumsOfSqs MeanSqs F.Model      R2 Pr(>F)
-    ## scan       1    0.4008 0.40079  1.0142 0.02358  0.344
-    ## Residuals 42   16.5982 0.39519         0.97642       
-    ## Total     43   16.9990                 1.00000
-
-``` r
 adonis(phyloseq::distance(ps4.css, method="bray") ~ scan, data = df.ps4.css) # scan explains 2.1% of community, p=0.45
-```
-
-    ## 
-    ## Call:
-    ## adonis(formula = phyloseq::distance(ps4.css, method = "bray") ~      scan, data = df.ps4.css) 
-    ## 
-    ## Permutation: free
-    ## Number of permutations: 999
-    ## 
-    ## Terms added sequentially (first to last)
-    ## 
-    ##           Df SumsOfSqs MeanSqs F.Model      R2 Pr(>F)
-    ## scan       1     0.306 0.30597  0.8867 0.02068  0.462
-    ## Residuals 42    14.493 0.34507         0.97932       
-    ## Total     43    14.799                 1.00000
-
-``` r
 adonis(phyloseq::distance(ps4.css, method="wunifrac") ~ scan, data = df.ps4.css) # scan explains 1.2% of community, p=0.777 *** Fig 1A
-```
-
-    ## Warning in UniFrac(physeq, weighted = TRUE, ...): Randomly assigning root as --
-    ## ASV2092 -- in the phylogenetic tree in the data you provided.
-
-    ## 
-    ## Call:
-    ## adonis(formula = phyloseq::distance(ps4.css, method = "wunifrac") ~      scan, data = df.ps4.css) 
-    ## 
-    ## Permutation: free
-    ## Number of permutations: 999
-    ## 
-    ## Terms added sequentially (first to last)
-    ## 
-    ##           Df SumsOfSqs  MeanSqs F.Model      R2 Pr(>F)
-    ## scan       1   0.02401 0.024005 0.49397 0.01162  0.753
-    ## Residuals 42   2.04104 0.048596         0.98838       
-    ## Total     43   2.06504                  1.00000
-
-``` r
 adonis(phyloseq::distance(ps4.hel, method="jaccard") ~ scan, data = df.ps4.hel) 
-```
-
-    ## 
-    ## Call:
-    ## adonis(formula = phyloseq::distance(ps4.hel, method = "jaccard") ~      scan, data = df.ps4.hel) 
-    ## 
-    ## Permutation: free
-    ## Number of permutations: 999
-    ## 
-    ## Terms added sequentially (first to last)
-    ## 
-    ##           Df SumsOfSqs MeanSqs F.Model      R2 Pr(>F)
-    ## scan       1    0.3768 0.37679  0.9466 0.02204  0.441
-    ## Residuals 42   16.7177 0.39804         0.97796       
-    ## Total     43   17.0945                 1.00000
-
-``` r
 adonis(phyloseq::distance(ps4.hel, method="bray") ~ scan, data = df.ps4.hel) 
-```
-
-    ## 
-    ## Call:
-    ## adonis(formula = phyloseq::distance(ps4.hel, method = "bray") ~      scan, data = df.ps4.hel) 
-    ## 
-    ## Permutation: free
-    ## Number of permutations: 999
-    ## 
-    ## Terms added sequentially (first to last)
-    ## 
-    ##           Df SumsOfSqs MeanSqs F.Model      R2 Pr(>F)
-    ## scan       1    0.2865 0.28647 0.82925 0.01936  0.529
-    ## Residuals 42   14.5091 0.34546         0.98064       
-    ## Total     43   14.7956                 1.00000
-
-``` r
 adonis(phyloseq::distance(ps4.hel, method="wunifrac") ~ scan, data = df.ps4.hel) 
-```
-
-    ## Warning in UniFrac(physeq, weighted = TRUE, ...): Randomly assigning root as --
-    ## ASV5763 -- in the phylogenetic tree in the data you provided.
-
-    ## 
-    ## Call:
-    ## adonis(formula = phyloseq::distance(ps4.hel, method = "wunifrac") ~      scan, data = df.ps4.hel) 
-    ## 
-    ## Permutation: free
-    ## Number of permutations: 999
-    ## 
-    ## Terms added sequentially (first to last)
-    ## 
-    ##           Df SumsOfSqs  MeanSqs F.Model      R2 Pr(>F)
-    ## scan       1   0.02132 0.021316 0.42378 0.00999  0.857
-    ## Residuals 42   2.11261 0.050300         0.99001       
-    ## Total     43   2.13393                  1.00000
-
-``` r
 adonis(phyloseq::distance(ps4.css.p, method="jaccard") ~ scan, data = df.ps4.css.p) # paired, scan explains 4.5%, p=0.401
-```
-
-    ## 
-    ## Call:
-    ## adonis(formula = phyloseq::distance(ps4.css.p, method = "jaccard") ~      scan, data = df.ps4.css.p) 
-    ## 
-    ## Permutation: free
-    ## Number of permutations: 999
-    ## 
-    ## Terms added sequentially (first to last)
-    ## 
-    ##           Df SumsOfSqs MeanSqs F.Model      R2 Pr(>F)
-    ## scan       1    0.3780 0.37805 0.94147 0.04496  0.415
-    ## Residuals 20    8.0310 0.40155         0.95504       
-    ## Total     21    8.4091                 1.00000
-
-``` r
 adonis(phyloseq::distance(ps4.css.p, method="bray") ~ scan, data = df.ps4.css.p) # paired, scan explains 3.8%, p=0.548
-```
-
-    ## 
-    ## Call:
-    ## adonis(formula = phyloseq::distance(ps4.css.p, method = "bray") ~      scan, data = df.ps4.css.p) 
-    ## 
-    ## Permutation: free
-    ## Number of permutations: 999
-    ## 
-    ## Terms added sequentially (first to last)
-    ## 
-    ##           Df SumsOfSqs MeanSqs F.Model      R2 Pr(>F)
-    ## scan       1    0.2822 0.28225 0.79392 0.03818  0.514
-    ## Residuals 20    7.1103 0.35551         0.96182       
-    ## Total     21    7.3925                 1.00000
-
-``` r
 adonis(phyloseq::distance(ps4.css.p, method="wunifrac") ~ scan, data = df.ps4.css.p) # paired, scan explains 1.8%, p=0.832
-```
-
-    ## Warning in UniFrac(physeq, weighted = TRUE, ...): Randomly assigning root as --
-    ## ASV3126 -- in the phylogenetic tree in the data you provided.
-
-    ## 
-    ## Call:
-    ## adonis(formula = phyloseq::distance(ps4.css.p, method = "wunifrac") ~      scan, data = df.ps4.css.p) 
-    ## 
-    ## Permutation: free
-    ## Number of permutations: 999
-    ## 
-    ## Terms added sequentially (first to last)
-    ## 
-    ##           Df SumsOfSqs  MeanSqs F.Model      R2 Pr(>F)
-    ## scan       1    0.0336 0.033598 0.36978 0.01815  0.845
-    ## Residuals 20    1.8172 0.090858         0.98185       
-    ## Total     21    1.8508                  1.00000
-
-``` r
 # paired or unpaired doesn't change the picture much, but paired increases the % explained and results in a higher p-value
 
 # Site contributes 24-51% of variation (unpaired first)
 adonis(phyloseq::distance(ps4.css, method="jaccard") ~ site, data = df.ps4.css) # site explains 24.0% of community, p=0.001
-```
-
-    ## 
-    ## Call:
-    ## adonis(formula = phyloseq::distance(ps4.css, method = "jaccard") ~      site, data = df.ps4.css) 
-    ## 
-    ## Permutation: free
-    ## Number of permutations: 999
-    ## 
-    ## Terms added sequentially (first to last)
-    ## 
-    ##           Df SumsOfSqs MeanSqs F.Model      R2 Pr(>F)    
-    ## site       1    4.0815  4.0815  13.271 0.24011  0.001 ***
-    ## Residuals 42   12.9174  0.3076         0.75989           
-    ## Total     43   16.9990                 1.00000           
-    ## ---
-    ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
-
-``` r
 adonis(phyloseq::distance(ps4.css, method="bray") ~ site, data = df.ps4.css) # site explains 37.4% of community, p=0.001
-```
-
-    ## 
-    ## Call:
-    ## adonis(formula = phyloseq::distance(ps4.css, method = "bray") ~      site, data = df.ps4.css) 
-    ## 
-    ## Permutation: free
-    ## Number of permutations: 999
-    ## 
-    ## Terms added sequentially (first to last)
-    ## 
-    ##           Df SumsOfSqs MeanSqs F.Model      R2 Pr(>F)    
-    ## site       1    5.5321  5.5321  25.073 0.37381  0.001 ***
-    ## Residuals 42    9.2669  0.2206         0.62619           
-    ## Total     43   14.7989                 1.00000           
-    ## ---
-    ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
-
-``` r
 adonis(phyloseq::distance(ps4.css, method="wunifrac") ~ site, data = df.ps4.css) # site explains 51.6% of community, p=0.001 *** Fig 1A
-```
-
-    ## Warning in UniFrac(physeq, weighted = TRUE, ...): Randomly assigning root as --
-    ## ASV3911 -- in the phylogenetic tree in the data you provided.
-
-    ## 
-    ## Call:
-    ## adonis(formula = phyloseq::distance(ps4.css, method = "wunifrac") ~      site, data = df.ps4.css) 
-    ## 
-    ## Permutation: free
-    ## Number of permutations: 999
-    ## 
-    ## Terms added sequentially (first to last)
-    ## 
-    ##           Df SumsOfSqs MeanSqs F.Model      R2 Pr(>F)    
-    ## site       1    1.4993  1.4993   45.85 0.52191  0.001 ***
-    ## Residuals 42    1.3735  0.0327         0.47809           
-    ## Total     43    2.8728                 1.00000           
-    ## ---
-    ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
-
-``` r
 adonis(phyloseq::distance(ps4.css.p, method="jaccard") ~ site, data = df.ps4.css.p) # paired, site explains 27.4%, p=0.001
-```
-
-    ## 
-    ## Call:
-    ## adonis(formula = phyloseq::distance(ps4.css.p, method = "jaccard") ~      site, data = df.ps4.css.p) 
-    ## 
-    ## Permutation: free
-    ## Number of permutations: 999
-    ## 
-    ## Terms added sequentially (first to last)
-    ## 
-    ##           Df SumsOfSqs MeanSqs F.Model      R2 Pr(>F)    
-    ## site       1    2.3055 2.30553  7.5548 0.27417  0.001 ***
-    ## Residuals 20    6.1035 0.30518         0.72583           
-    ## Total     21    8.4091                 1.00000           
-    ## ---
-    ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
-
-``` r
 adonis(phyloseq::distance(ps4.css.p, method="bray") ~ site, data = df.ps4.css.p) # paired, site explains 42.0%, p=0.001
-```
-
-    ## 
-    ## Call:
-    ## adonis(formula = phyloseq::distance(ps4.css.p, method = "bray") ~      site, data = df.ps4.css.p) 
-    ## 
-    ## Permutation: free
-    ## Number of permutations: 999
-    ## 
-    ## Terms added sequentially (first to last)
-    ## 
-    ##           Df SumsOfSqs MeanSqs F.Model      R2 Pr(>F)    
-    ## site       1    3.1057 3.10567  14.489 0.42011  0.001 ***
-    ## Residuals 20    4.2869 0.21434         0.57989           
-    ## Total     21    7.3925                 1.00000           
-    ## ---
-    ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
-
-``` r
 adonis(phyloseq::distance(ps4.css.p, method="wunifrac") ~ site, data = df.ps4.css.p) # paired, site explains 60.6%, p=0.001
-```
-
-    ## Warning in UniFrac(physeq, weighted = TRUE, ...): Randomly assigning root as --
-    ## ASV87 -- in the phylogenetic tree in the data you provided.
-
-    ## 
-    ## Call:
-    ## adonis(formula = phyloseq::distance(ps4.css.p, method = "wunifrac") ~      site, data = df.ps4.css.p) 
-    ## 
-    ## Permutation: free
-    ## Number of permutations: 999
-    ## 
-    ## Terms added sequentially (first to last)
-    ## 
-    ##           Df SumsOfSqs MeanSqs F.Model      R2 Pr(>F)    
-    ## site       1   1.16992 1.16992  30.825 0.60649  0.001 ***
-    ## Residuals 20   0.75907 0.03795         0.39351           
-    ## Total     21   1.92900                 1.00000           
-    ## ---
-    ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
-
-``` r
 # here, paired increases the % explained but results in the same p-value
 
 # 2) Within North and South sites separately, positions are different Do this for ALL and PAIRED
@@ -1085,370 +795,29 @@ df.ps4.css.north.p <- as(sample_data(ps4.css.north.p), "data.frame")
 
 # Testing position above, below, within Tsunami deposit separately among North and South sites
 adonis(phyloseq::distance(ps4.css.north, method="jaccard") ~ position, data = df.ps4.css.north) # position explains 31.1% of community, p=0.001
-```
-
-    ## 
-    ## Call:
-    ## adonis(formula = phyloseq::distance(ps4.css.north, method = "jaccard") ~      position, data = df.ps4.css.north) 
-    ## 
-    ## Permutation: free
-    ## Number of permutations: 999
-    ## 
-    ## Terms added sequentially (first to last)
-    ## 
-    ##           Df SumsOfSqs MeanSqs F.Model      R2 Pr(>F)    
-    ## position   2    1.7746 0.88732  4.5154 0.31108  0.001 ***
-    ## Residuals 20    3.9302 0.19651         0.68892           
-    ## Total     22    5.7049                 1.00000           
-    ## ---
-    ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
-
-``` r
 adonis(phyloseq::distance(ps4.css.north, method="bray") ~ position, data = df.ps4.css.north) # position explains 37.8% of community, p=0.001
-```
-
-    ## 
-    ## Call:
-    ## adonis(formula = phyloseq::distance(ps4.css.north, method = "bray") ~      position, data = df.ps4.css.north) 
-    ## 
-    ## Permutation: free
-    ## Number of permutations: 999
-    ## 
-    ## Terms added sequentially (first to last)
-    ## 
-    ##           Df SumsOfSqs MeanSqs F.Model      R2 Pr(>F)    
-    ## position   2    1.3825 0.69124  6.0813 0.37816  0.001 ***
-    ## Residuals 20    2.2733 0.11367         0.62184           
-    ## Total     22    3.6558                 1.00000           
-    ## ---
-    ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
-
-``` r
 adonis(phyloseq::distance(ps4.css.north, method="wunifrac") ~ position, data = df.ps4.css.north) # position explains 47.3% of community, p=0.001 *** Fig 1B
-```
-
-    ## Warning in UniFrac(physeq, weighted = TRUE, ...): Randomly assigning root as --
-    ## ASV2353 -- in the phylogenetic tree in the data you provided.
-
-    ## 
-    ## Call:
-    ## adonis(formula = phyloseq::distance(ps4.css.north, method = "wunifrac") ~      position, data = df.ps4.css.north) 
-    ## 
-    ## Permutation: free
-    ## Number of permutations: 999
-    ## 
-    ## Terms added sequentially (first to last)
-    ## 
-    ##           Df SumsOfSqs  MeanSqs F.Model      R2 Pr(>F)    
-    ## position   2   0.13026 0.065128   8.985 0.47327  0.001 ***
-    ## Residuals 20   0.14497 0.007249         0.52673           
-    ## Total     22   0.27523                  1.00000           
-    ## ---
-    ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
-
-``` r
 adonis(phyloseq::distance(ps4.css.north.p, method="jaccard") ~ position, data = df.ps4.css.north.p) # paired, position explains 25.2%, p=0.005
-```
-
-    ## 
-    ## Call:
-    ## adonis(formula = phyloseq::distance(ps4.css.north.p, method = "jaccard") ~      position, data = df.ps4.css.north.p) 
-    ## 
-    ## Permutation: free
-    ## Number of permutations: 999
-    ## 
-    ## Terms added sequentially (first to last)
-    ## 
-    ##           Df SumsOfSqs MeanSqs F.Model      R2 Pr(>F)    
-    ## position   1   0.78912 0.78912  3.3786 0.25254  0.001 ***
-    ## Residuals 10   2.33562 0.23356         0.74746           
-    ## Total     11   3.12474                 1.00000           
-    ## ---
-    ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
-
-``` r
 adonis(phyloseq::distance(ps4.css.north.p, method="bray") ~ position, data = df.ps4.css.north.p) # paired, position explains 30.6%, p=0.003
-```
-
-    ## 
-    ## Call:
-    ## adonis(formula = phyloseq::distance(ps4.css.north.p, method = "bray") ~      position, data = df.ps4.css.north.p) 
-    ## 
-    ## Permutation: free
-    ## Number of permutations: 999
-    ## 
-    ## Terms added sequentially (first to last)
-    ## 
-    ##           Df SumsOfSqs MeanSqs F.Model     R2 Pr(>F)   
-    ## position   1   0.65045 0.65045  4.4051 0.3058  0.004 **
-    ## Residuals 10   1.47659 0.14766         0.6942          
-    ## Total     11   2.12703                 1.0000          
-    ## ---
-    ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
-
-``` r
 adonis(phyloseq::distance(ps4.css.north.p, method="wunifrac") ~ position, data = df.ps4.css.north.p) # paired, position explains 46.2%, p=0.002
-```
-
-    ## Warning in UniFrac(physeq, weighted = TRUE, ...): Randomly assigning root as --
-    ## ASV4982 -- in the phylogenetic tree in the data you provided.
-
-    ## 
-    ## Call:
-    ## adonis(formula = phyloseq::distance(ps4.css.north.p, method = "wunifrac") ~      position, data = df.ps4.css.north.p) 
-    ## 
-    ## Permutation: free
-    ## Number of permutations: 999
-    ## 
-    ## Terms added sequentially (first to last)
-    ## 
-    ##           Df SumsOfSqs   MeanSqs F.Model      R2 Pr(>F)    
-    ## position   1  0.016413 0.0164130  8.5905 0.46209  0.001 ***
-    ## Residuals 10  0.019106 0.0019106         0.53791           
-    ## Total     11  0.035519                   1.00000           
-    ## ---
-    ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
-
-``` r
 # position clearly matters, p-values are higher and slightly less % is explained with paired sample
 
 adonis(phyloseq::distance(ps4.css.south, method="jaccard") ~ position, data = df.ps4.css.south) # position explains 28.2% of community, p=0.001
-```
-
-    ## 
-    ## Call:
-    ## adonis(formula = phyloseq::distance(ps4.css.south, method = "jaccard") ~      position, data = df.ps4.css.south) 
-    ## 
-    ## Permutation: free
-    ## Number of permutations: 999
-    ## 
-    ## Terms added sequentially (first to last)
-    ## 
-    ##           Df SumsOfSqs MeanSqs F.Model      R2 Pr(>F)    
-    ## position   2    2.0395 1.01977  3.5484 0.28278  0.001 ***
-    ## Residuals 18    5.1730 0.28739         0.71722           
-    ## Total     20    7.2126                 1.00000           
-    ## ---
-    ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
-
-``` r
 adonis(phyloseq::distance(ps4.css.south, method="bray") ~ position, data = df.ps4.css.south) # position explains 38.4% of community, p=0.001
-```
-
-    ## 
-    ## Call:
-    ## adonis(formula = phyloseq::distance(ps4.css.south, method = "bray") ~      position, data = df.ps4.css.south) 
-    ## 
-    ## Permutation: free
-    ## Number of permutations: 999
-    ## 
-    ## Terms added sequentially (first to last)
-    ## 
-    ##           Df SumsOfSqs MeanSqs F.Model      R2 Pr(>F)    
-    ## position   2    2.1544 1.07718  5.6092 0.38395  0.001 ***
-    ## Residuals 18    3.4567 0.19204         0.61605           
-    ## Total     20    5.6110                 1.00000           
-    ## ---
-    ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
-
-``` r
 adonis(phyloseq::distance(ps4.css.south, method="wunifrac") ~ position, data = df.ps4.css.south) # position explains 47.2% of community, p=0.001 *** Fig 1C
-```
-
-    ## Warning in UniFrac(physeq, weighted = TRUE, ...): Randomly assigning root as --
-    ## ASV4113 -- in the phylogenetic tree in the data you provided.
-
-    ## 
-    ## Call:
-    ## adonis(formula = phyloseq::distance(ps4.css.south, method = "wunifrac") ~      position, data = df.ps4.css.south) 
-    ## 
-    ## Permutation: free
-    ## Number of permutations: 999
-    ## 
-    ## Terms added sequentially (first to last)
-    ## 
-    ##           Df SumsOfSqs  MeanSqs F.Model      R2 Pr(>F)    
-    ## position   2   0.54567 0.272836  8.1125 0.47407  0.001 ***
-    ## Residuals 18   0.60537 0.033632         0.52593           
-    ## Total     20   1.15104                  1.00000           
-    ## ---
-    ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
-
-``` r
 adonis(phyloseq::distance(ps4.css.south.p, method="jaccard") ~ position, data = df.ps4.css.south.p) # paired, position explains 19.2%, p=0.026
-```
-
-    ## 
-    ## Call:
-    ## adonis(formula = phyloseq::distance(ps4.css.south.p, method = "jaccard") ~      position, data = df.ps4.css.south.p) 
-    ## 
-    ## Permutation: free
-    ## Number of permutations: 999
-    ## 
-    ## Terms added sequentially (first to last)
-    ## 
-    ##           Df SumsOfSqs MeanSqs F.Model      R2 Pr(>F)  
-    ## position   1   0.57319 0.57319  1.9062 0.19242  0.029 *
-    ## Residuals  8   2.40559 0.30070         0.80758         
-    ## Total      9   2.97878                 1.00000         
-    ## ---
-    ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
-
-``` r
 adonis(phyloseq::distance(ps4.css.south.p, method="bray") ~ position, data = df.ps4.css.south.p) # paired, position explains 23.6%, p=0.019
-```
-
-    ## 
-    ## Call:
-    ## adonis(formula = phyloseq::distance(ps4.css.south.p, method = "bray") ~      position, data = df.ps4.css.south.p) 
-    ## 
-    ## Permutation: free
-    ## Number of permutations: 999
-    ## 
-    ## Terms added sequentially (first to last)
-    ## 
-    ##           Df SumsOfSqs MeanSqs F.Model      R2 Pr(>F)  
-    ## position   1   0.51088 0.51088  2.4785 0.23653  0.021 *
-    ## Residuals  8   1.64897 0.20612         0.76347         
-    ## Total      9   2.15985                 1.00000         
-    ## ---
-    ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
-
-``` r
 adonis(phyloseq::distance(ps4.css.south.p, method="wunifrac") ~ position, data = df.ps4.css.south.p) # paired, position explains 22.6%, p=0.025
-```
 
-    ## Warning in UniFrac(physeq, weighted = TRUE, ...): Randomly assigning root as --
-    ## ASV513 -- in the phylogenetic tree in the data you provided.
-
-    ## 
-    ## Call:
-    ## adonis(formula = phyloseq::distance(ps4.css.south.p, method = "wunifrac") ~      position, data = df.ps4.css.south.p) 
-    ## 
-    ## Permutation: free
-    ## Number of permutations: 999
-    ## 
-    ## Terms added sequentially (first to last)
-    ## 
-    ##           Df SumsOfSqs  MeanSqs F.Model      R2 Pr(>F)  
-    ## position   1   0.08106 0.081056  2.3724 0.22872  0.029 *
-    ## Residuals  8   0.27333 0.034166         0.77128         
-    ## Total      9   0.35439                  1.00000         
-    ## ---
-    ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
-
-``` r
 # Testing storage time
 adonis(phyloseq::distance(ps4.css.north, method="wunifrac") ~ storage_days, data = df.ps4.css.north) # storage time explains 3.7%, p=0.567 *** supplemental fig
-```
-
-    ## Warning in UniFrac(physeq, weighted = TRUE, ...): Randomly assigning root as --
-    ## ASV6680 -- in the phylogenetic tree in the data you provided.
-
-    ## 
-    ## Call:
-    ## adonis(formula = phyloseq::distance(ps4.css.north, method = "wunifrac") ~      storage_days, data = df.ps4.css.north) 
-    ## 
-    ## Permutation: free
-    ## Number of permutations: 999
-    ## 
-    ## Terms added sequentially (first to last)
-    ## 
-    ##              Df SumsOfSqs   MeanSqs F.Model      R2 Pr(>F)
-    ## storage_days  1  0.007679 0.0076793 0.79693 0.03656  0.583
-    ## Residuals    21  0.202358 0.0096361         0.96344       
-    ## Total        22  0.210037                   1.00000
-
-``` r
 adonis(phyloseq::distance(ps4.css.south, method="wunifrac") ~ storage_days, data = df.ps4.css.south) # storage time explains 3.9%, p=0.592 *** supplemental fig
-```
 
-    ## Warning in UniFrac(physeq, weighted = TRUE, ...): Randomly assigning root as --
-    ## ASV6684 -- in the phylogenetic tree in the data you provided.
-
-    ## 
-    ## Call:
-    ## adonis(formula = phyloseq::distance(ps4.css.south, method = "wunifrac") ~      storage_days, data = df.ps4.css.south) 
-    ## 
-    ## Permutation: free
-    ## Number of permutations: 999
-    ## 
-    ## Terms added sequentially (first to last)
-    ## 
-    ##              Df SumsOfSqs  MeanSqs F.Model      R2 Pr(>F)
-    ## storage_days  1   0.01810 0.018097 0.78847 0.03985  0.581
-    ## Residuals    19   0.43610 0.022952         0.96015       
-    ## Total        20   0.45419                  1.00000
-
-``` r
 # Sedtype accounts for less variance than position above/within/below tsunami deposit
 adonis(phyloseq::distance(ps4.css.north, method="wunifrac") ~ sedtype, data = df.ps4.css.north) # sedtype explains 31.0%, p=0.001
-```
-
-    ## Warning in UniFrac(physeq, weighted = TRUE, ...): Randomly assigning root as --
-    ## ASV2156 -- in the phylogenetic tree in the data you provided.
-
-    ## 
-    ## Call:
-    ## adonis(formula = phyloseq::distance(ps4.css.north, method = "wunifrac") ~      sedtype, data = df.ps4.css.north) 
-    ## 
-    ## Permutation: free
-    ## Number of permutations: 999
-    ## 
-    ## Terms added sequentially (first to last)
-    ## 
-    ##           Df SumsOfSqs  MeanSqs F.Model      R2 Pr(>F)    
-    ## sedtype    1   0.17572 0.175719  9.3633 0.30838  0.001 ***
-    ## Residuals 21   0.39410 0.018767         0.69162           
-    ## Total     22   0.56982                  1.00000           
-    ## ---
-    ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
-
-``` r
 adonis(phyloseq::distance(ps4.css.north, method="wunifrac") ~ sedtype, data = df.ps4.css.north) # sedtype explains 31.1%, p=0.001
-```
-
-    ## Warning in UniFrac(physeq, weighted = TRUE, ...): Randomly assigning root as --
-    ## ASV3881 -- in the phylogenetic tree in the data you provided.
-
-    ## 
-    ## Call:
-    ## adonis(formula = phyloseq::distance(ps4.css.north, method = "wunifrac") ~      sedtype, data = df.ps4.css.north) 
-    ## 
-    ## Permutation: free
-    ## Number of permutations: 999
-    ## 
-    ## Terms added sequentially (first to last)
-    ## 
-    ##           Df SumsOfSqs   MeanSqs F.Model      R2 Pr(>F)    
-    ## sedtype    1  0.018769 0.0187692   9.723 0.31647  0.001 ***
-    ## Residuals 21  0.040538 0.0019304         0.68353           
-    ## Total     22  0.059308                   1.00000           
-    ## ---
-    ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
-
-``` r
 adonis(phyloseq::distance(ps4.css.south, method="wunifrac") ~ sedtype, data = df.ps4.css.south) # sedtype explains 24.7%, p=0.001
 ```
-
-    ## Warning in UniFrac(physeq, weighted = TRUE, ...): Randomly assigning root as --
-    ## ASV5310 -- in the phylogenetic tree in the data you provided.
-
-    ## 
-    ## Call:
-    ## adonis(formula = phyloseq::distance(ps4.css.south, method = "wunifrac") ~      sedtype, data = df.ps4.css.south) 
-    ## 
-    ## Permutation: free
-    ## Number of permutations: 999
-    ## 
-    ## Terms added sequentially (first to last)
-    ## 
-    ##           Df SumsOfSqs  MeanSqs F.Model     R2 Pr(>F)    
-    ## sedtype    1   0.13475 0.134747  6.2593 0.2478  0.001 ***
-    ## Residuals 19   0.40902 0.021527         0.7522           
-    ## Total     20   0.54377                  1.0000           
-    ## ---
-    ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 
 ## 5\) Biomarker detection between scanned/unscanned samples with DESeq2
 
@@ -1559,7 +928,7 @@ gg.biom.scan
 
     ## Warning: Removed 4 rows containing missing values (geom_text).
 
-![](02_sequence_analysis_files/figure-gfm/unnamed-chunk-5-1.png)<!-- -->
+![](02_sequence_analysis_files/figure-gfm/biomarkers-1.png)<!-- -->
 
 # Package versions:
 
