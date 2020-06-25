@@ -205,6 +205,7 @@ library(metagenomeSeq)
 ``` r
 library(patchwork)
 library(RColorBrewer)
+library(wesanderson)
 library(here)
 ```
 
@@ -233,13 +234,21 @@ ps4 <- readRDS(file = "ps4")
 ps4.ra <- transform_sample_counts(ps4, function(OTU) OTU/sum(OTU)) # transform read counts to relative abundances
 
 # graph sequences belonging to most abundant classes (as done with the OTU dataset) 
-classes.ps4 <- unique(tax_table(ps4)[,3]) # obtains the 122 unique class names
-classes.ps4 <- classes.ps4[!is.na(classes.ps4)] # removes the NA (121 unique classes)
-mx.asv.ra <- as.data.frame(otu_table(ps4.ra)) # creates a matrix from the phyloseq object
-class.ra <- vector("list",0) # define vector
-for (i in classes.ps4) {class.ra[[i]] <- sum(mx.asv.ra[,which(tax_table(ps4.ra)[,3]==i)])/44} # calculate average % abund of each class
-class.output <- cbind(class.ra)[,1] 
-what <- data.frame(sort(unlist(class.output), decreasing=TRUE))
+
+# first define a function that summarizes the most abundant taxa within a phyloseq object
+get.abund.taxa <- function(ps, taxlevel){
+  taxlist <- unique(tax_table(ps)[,taxlevel]) # obtains unique taxonomic names
+  taxlist <- taxlist[!is.na(taxlist)] # removes NAs
+  mx.ra <- as.data.frame(otu_table(ps)) # creates a matrix from the phyloseq object
+  tax.ra <- vector("list",0) # define vector
+  for (i in taxlist) {tax.ra[[i]] <- sum(mx.ra[,which(tax_table(ps)[,taxlevel]==i)])/nsamples(ps)} # calculate average % abund of each tax
+  tax.output <- cbind(tax.ra)[,1] 
+  tax.output <- data.frame(sort(unlist(tax.output), decreasing=TRUE))
+  colnames(tax.output)[1] <- "relabund"
+  return(tax.output)
+}
+
+what <- get.abund.taxa(ps4.ra,3) # take the most abundant classes (corresponding to 3) from the relabund-transformed ps object
 top.c <- rownames(what)[1:17] # these are the most abundant 17 classes, each > 1% relabund
 sum(what[1:17,1]) # 78% of reads are from these top 17 classes
 ```
@@ -265,6 +274,10 @@ top300bp <- plot_bar(ps4.ra.top300, fill="Class") # barplot showing most abundan
 
 # Now the final barplot
 # subset four pseudo-panels (North/South x Scanned/Unscanned) that are each individual plots, but arrange them together
+# but do it in a way that orders by depth, then by storage days
+sample_data(ps4.ra.top.c)[which(sample_data(ps4.ra.top.c)$storage_days==0),7] <- "00"
+sample_data(ps4.ra.top.c)[which(sample_data(ps4.ra.top.c)$storage_days==1),7] <- "01"
+sample_data(ps4.ra.top.c)[which(sample_data(ps4.ra.top.c)$storage_days==8),7] <- "08"
 sample_data(ps4.ra.top.c)$label <- (paste(sample_data(ps4.ra.top.c)$depth_cm, "cm,", sample_data(ps4.ra.top.c)$storage_days, "d")) # add a character vector to plot by
 
 ps4.ra.top.c.north.s <- subset_samples(ps4.ra.top.c, site=="North" & scan=="Scanned") # subset the North samples (scanned and unscanned)
@@ -322,25 +335,98 @@ barplot
 
 ![](02_sequence_analysis_files/figure-gfm/barplot-1.png)<!-- -->
 
+``` r
+# Some other stats:
+
+# Zixibacteria differences by above/within/below cores?
+ps4.ra.zixi <- subset_taxa(ps4.ra, Phylum=="Zixibacteria")
+zixi_sum <- rowSums(otu_table(ps4.ra.zixi))*100
+zixi_count <- data.frame(sample_data(ps4.ra), zixi_sum)
+summary(zixi_count$zixi_sum) # mean zixibacteria relabund is really 5.4%?
+```
+
+    ##     Min.  1st Qu.   Median     Mean  3rd Qu.     Max. 
+    ##  0.09098  0.53500  1.09182  5.44618  7.60856 26.48554
+
+``` r
+unique(tax_table(ps4.ra.zixi)[,3]) # no Classes assigned to Zixibacteria (that's why they didn't show up in barplot of classes)
+```
+
+    ## Taxonomy Table:     [1 taxa by 1 taxonomic ranks]:
+    ##      Class
+    ## ASV6 NA
+
+``` r
+top.phyla <- get.abund.taxa(ps4.ra, 2)
+top.phyla[1:10,] # sure enough, zixi are the most abundant phylum without any classes represented in the barplot (Acidobacteria a close 2nd)
+```
+
+    ##  [1] 0.42678787 0.08136048 0.07564139 0.07302138 0.05446181 0.04773971
+    ##  [7] 0.03346071 0.02960185 0.01491008 0.01319801
+
+``` r
+# are zixibacteria more abundant in tsunami deposits?
+south.tsunami.zixi.abund <- distinct(zixi_count %>% filter(sedtype=="Tsunami Deposit" & site=="South"), zixi_sum)
+south.sed.zixi.abund <- distinct(zixi_count %>% filter(sedtype=="Estuary Sediment" & site=="South"), zixi_sum)
+t.test(south.tsunami.zixi.abund, south.sed.zixi.abund) # yes in south samples
+```
+
+    ## 
+    ##  Welch Two Sample t-test
+    ## 
+    ## data:  south.tsunami.zixi.abund and south.sed.zixi.abund
+    ## t = 6.7062, df = 11.359, p-value = 2.859e-05
+    ## alternative hypothesis: true difference in means is not equal to 0
+    ## 95 percent confidence interval:
+    ##   9.110953 17.962262
+    ## sample estimates:
+    ## mean of x mean of y 
+    ## 18.563011  5.026404
+
+``` r
+n.tsunami.zixi.abund <- distinct(zixi_count %>% filter(sedtype=="Tsunami Deposit" & site=="North"), zixi_sum)
+n.sed.zixi.abund <- distinct(zixi_count %>% filter(sedtype=="Estuary Sediment" & site=="North"), zixi_sum)
+t.test(n.tsunami.zixi.abund, n.sed.zixi.abund) # no in north samples
+```
+
+    ## 
+    ##  Welch Two Sample t-test
+    ## 
+    ## data:  n.tsunami.zixi.abund and n.sed.zixi.abund
+    ## t = 1.4644, df = 13.377, p-value = 0.1662
+    ## alternative hypothesis: true difference in means is not equal to 0
+    ## 95 percent confidence interval:
+    ##  -0.07971037  0.41815217
+    ## sample estimates:
+    ## mean of x mean of y 
+    ## 0.6502415 0.4810206
+
+``` r
+summary(distinct(zixi_count %>% filter(site=="North"), zixi_sum)) # 0.5% in North samples
+```
+
+    ##     zixi_sum      
+    ##  Min.   :0.09098  
+    ##  1st Qu.:0.39938  
+    ##  Median :0.54071  
+    ##  Mean   :0.53252  
+    ##  3rd Qu.:0.65273  
+    ##  Max.   :1.12474
+
+``` r
+# how many ignavibacteria ASVs are there? 
+ps4.ra.ig <- subset_taxa(ps4.ra, Genus=="Ignavibacterium")
+ntaxa(tax_table(ps4.ra.ig)) # 27, so two that are biomarkers for Unscanned isn't super concerning
+```
+
+    ## [1] 28
+
 ## 2\) Alpha diversity analysis of all samples
 
 ``` r
 paircode <- read.csv(file="paircode.csv") # import the file showing which samples are paired with one another
 sample_data(ps4) <- data.frame(sample_data(ps4), paircode) # add this info to the ps object
 
-plot_richness(ps4, x="scan", measures = c("Observed", "Shannon")) # simple plot
-```
-
-    ## Warning in estimate_richness(physeq, split = TRUE, measures = measures): The data you have provided does not have
-    ## any singletons. This is highly suspicious. Results of richness
-    ## estimates (for example) are probably unreliable, or wrong, if you have already
-    ## trimmed low-abundance taxa from the data.
-    ## 
-    ## We recommended that you find the un-trimmed data and retry.
-
-![](02_sequence_analysis_files/figure-gfm/alpha%20diversity%20supplemental%20figure-1.png)<!-- -->
-
-``` r
 alphadiv <- estimate_richness(ps4, measures = c("Observed", "Shannon")) # calculate alpha diversity
 ```
 
@@ -355,9 +441,38 @@ alphadiv <- estimate_richness(ps4, measures = c("Observed", "Shannon")) # calcul
 alphadiv <- data.frame(alphadiv, sample_data(ps4)) # write metadata into an alpha diversity data frame
 
 # Is there a difference in alpha diversity between scanned and unscanned samples?
-# t.test(alphadiv[which(alphadiv$scan=="Unscanned"),]$Observed, alphadiv[which(alphadiv$scan=="Scanned"),]$Observed) # observed richness, no
-# t.test(alphadiv[which(alphadiv$scan=="Unscanned"),]$Shannon, alphadiv[which(alphadiv$scan=="Scanned"),]$Shannon) # shannon, no
+t.test(alphadiv[which(alphadiv$scan=="Unscanned"),]$Observed, alphadiv[which(alphadiv$scan=="Scanned"),]$Observed) # observed richness, no
+```
 
+    ## 
+    ##  Welch Two Sample t-test
+    ## 
+    ## data:  alphadiv[which(alphadiv$scan == "Unscanned"), ]$Observed and alphadiv[which(alphadiv$scan == "Scanned"), ]$Observed
+    ## t = -1.16, df = 22.128, p-value = 0.2584
+    ## alternative hypothesis: true difference in means is not equal to 0
+    ## 95 percent confidence interval:
+    ##  -297.50432   84.02284
+    ## sample estimates:
+    ## mean of x mean of y 
+    ##  352.2593  459.0000
+
+``` r
+t.test(alphadiv[which(alphadiv$scan=="Unscanned"),]$Shannon, alphadiv[which(alphadiv$scan=="Scanned"),]$Shannon) # shannon, no
+```
+
+    ## 
+    ##  Welch Two Sample t-test
+    ## 
+    ## data:  alphadiv[which(alphadiv$scan == "Unscanned"), ]$Shannon and alphadiv[which(alphadiv$scan == "Scanned"), ]$Shannon
+    ## t = -1.6877, df = 31.105, p-value = 0.1015
+    ## alternative hypothesis: true difference in means is not equal to 0
+    ## 95 percent confidence interval:
+    ##  -0.67180106  0.06337025
+    ## sample estimates:
+    ## mean of x mean of y 
+    ##  4.681057  4.985273
+
+``` r
 # Alpha diversity should be analyzed by pairing scanned/unscanned samples:
 df.ps4 <- data.frame(sample_data(ps4), alphadiv[,1:3]) # combine sample data and alpha diversity into a df
 df.ps4.p <- df.ps4 %>% filter(is.paired=="y") # filter only the paired samples
@@ -368,73 +483,10 @@ df.ps4.p <- df.ps4.p[order(df.ps4.p$paircode),] # order the dataframe by their p
 alphadiv$storage_days <- as.numeric(alphadiv$storage_days) # convert to numeric
 
 # plot alpha diversity over time
-gg.alphadiv.obs <- ggplot(alphadiv, aes(storage_days, Observed, color=depth_cm))+
-  geom_point()+
-  geom_smooth(method = "lm", linetype="dashed", color="black")+
-  scale_x_continuous("Days stored")+
-  scale_color_gradient("Depth (cm)")+
-  facet_grid(~site)+
-  theme_bw()+
-  guides(fill = guide_legend(reverse = TRUE))
-
-gg.alphadiv.sha <- ggplot(alphadiv, aes(storage_days, Shannon, color=depth_cm))+
-  geom_point()+
-  geom_smooth(method = "lm", linetype="dashed", color="black")+
-  scale_x_continuous("Days stored")+
-  scale_color_gradient("Depth (cm)")+
-  facet_grid(~site)+
-  theme_bw()
-
-# regression of alpha diversity over storage time
-alphadiv.north <- alphadiv %>% filter(site=="North")
+alphadiv.north <- alphadiv %>% filter(site=="North") # subset N and S for plots
 alphadiv.south<- alphadiv %>% filter(site=="South")
 
-summary(lm(alphadiv.north$Shannon ~ alphadiv.north$storage_days)) # linear model (Shannon diversity index, north site) p=0.205 
-```
-
-    ## 
-    ## Call:
-    ## lm(formula = alphadiv.north$Shannon ~ alphadiv.north$storage_days)
-    ## 
-    ## Residuals:
-    ##     Min      1Q  Median      3Q     Max 
-    ## -0.9816 -0.3715 -0.1882  0.2867  1.2103 
-    ## 
-    ## Coefficients:
-    ##                             Estimate Std. Error t value Pr(>|t|)    
-    ## (Intercept)                  4.92903    0.18359  26.848   <2e-16 ***
-    ## alphadiv.north$storage_days -0.01771    0.01354  -1.308    0.205    
-    ## ---
-    ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
-    ## 
-    ## Residual standard error: 0.5721 on 21 degrees of freedom
-    ## Multiple R-squared:  0.07532,    Adjusted R-squared:  0.03129 
-    ## F-statistic: 1.711 on 1 and 21 DF,  p-value: 0.205
-
-``` r
-summary(lm(alphadiv.south$Shannon ~ alphadiv.south$storage_days)) # linear model (Shannon diversity index, south site) p=0.437 
-```
-
-    ## 
-    ## Call:
-    ## lm(formula = alphadiv.south$Shannon ~ alphadiv.south$storage_days)
-    ## 
-    ## Residuals:
-    ##      Min       1Q   Median       3Q      Max 
-    ## -0.87614 -0.44086 -0.03745  0.27780  1.13250 
-    ## 
-    ## Coefficients:
-    ##                             Estimate Std. Error t value Pr(>|t|)    
-    ## (Intercept)                  4.98734    0.21063  23.678 1.45e-15 ***
-    ## alphadiv.south$storage_days -0.01213    0.01533  -0.791    0.438    
-    ## ---
-    ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
-    ## 
-    ## Residual standard error: 0.5917 on 19 degrees of freedom
-    ## Multiple R-squared:  0.03192,    Adjusted R-squared:  -0.01903 
-    ## F-statistic: 0.6265 on 1 and 19 DF,  p-value: 0.4384
-
-``` r
+# regression of alpha diversity over storage time
 summary(lm(alphadiv.north$Observed ~ alphadiv.north$storage_days)) # linear model (Observed diversity index, north site) p=0.153
 ```
 
@@ -456,6 +508,29 @@ summary(lm(alphadiv.north$Observed ~ alphadiv.north$storage_days)) # linear mode
     ## Residual standard error: 223.8 on 21 degrees of freedom
     ## Multiple R-squared:  0.09443,    Adjusted R-squared:  0.05131 
     ## F-statistic:  2.19 on 1 and 21 DF,  p-value: 0.1538
+
+``` r
+summary(lm(alphadiv.north$Shannon ~ alphadiv.north$storage_days)) # linear model (Shannon diversity index, north site) p=0.205 
+```
+
+    ## 
+    ## Call:
+    ## lm(formula = alphadiv.north$Shannon ~ alphadiv.north$storage_days)
+    ## 
+    ## Residuals:
+    ##     Min      1Q  Median      3Q     Max 
+    ## -0.9816 -0.3715 -0.1882  0.2867  1.2103 
+    ## 
+    ## Coefficients:
+    ##                             Estimate Std. Error t value Pr(>|t|)    
+    ## (Intercept)                  4.92903    0.18359  26.848   <2e-16 ***
+    ## alphadiv.north$storage_days -0.01771    0.01354  -1.308    0.205    
+    ## ---
+    ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+    ## 
+    ## Residual standard error: 0.5721 on 21 degrees of freedom
+    ## Multiple R-squared:  0.07532,    Adjusted R-squared:  0.03129 
+    ## F-statistic: 1.711 on 1 and 21 DF,  p-value: 0.205
 
 ``` r
 summary(lm(alphadiv.south$Observed ~ alphadiv.south$storage_days)) # linear model (Observed diversity index, south site) p=0.87629  
@@ -481,20 +556,318 @@ summary(lm(alphadiv.south$Observed ~ alphadiv.south$storage_days)) # linear mode
     ## F-statistic: 0.02382 on 1 and 19 DF,  p-value: 0.879
 
 ``` r
-# plot alpha diversity
-gg.alphadiv.obs + gg.alphadiv.sha + plot_layout(guides="collect") # no huge changes in observed ASV richness or Shannon diversity over time
+summary(lm(alphadiv.south$Shannon ~ alphadiv.south$storage_days)) # linear model (Shannon diversity index, south site) p=0.437 
 ```
 
-![](02_sequence_analysis_files/figure-gfm/alpha%20diversity%20supplemental%20figure-2.png)<!-- -->
+    ## 
+    ## Call:
+    ## lm(formula = alphadiv.south$Shannon ~ alphadiv.south$storage_days)
+    ## 
+    ## Residuals:
+    ##      Min       1Q   Median       3Q      Max 
+    ## -0.87614 -0.44086 -0.03745  0.27780  1.13250 
+    ## 
+    ## Coefficients:
+    ##                             Estimate Std. Error t value Pr(>|t|)    
+    ## (Intercept)                  4.98734    0.21063  23.678 1.45e-15 ***
+    ## alphadiv.south$storage_days -0.01213    0.01533  -0.791    0.438    
+    ## ---
+    ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+    ## 
+    ## Residual standard error: 0.5917 on 19 degrees of freedom
+    ## Multiple R-squared:  0.03192,    Adjusted R-squared:  -0.01903 
+    ## F-statistic: 0.6265 on 1 and 19 DF,  p-value: 0.4384
+
+``` r
+# regression of alpha diversity over depth
+summary(lm(alphadiv.north$Shannon ~ alphadiv.north$depth_cm)) # linear model (Shannon diversity index, north site) p=0.9392 
+```
+
+    ## 
+    ## Call:
+    ## lm(formula = alphadiv.north$Shannon ~ alphadiv.north$depth_cm)
+    ## 
+    ## Residuals:
+    ##     Min      1Q  Median      3Q     Max 
+    ## -0.8285 -0.4254 -0.1108  0.3270  1.3732 
+    ## 
+    ## Coefficients:
+    ##                          Estimate Std. Error t value Pr(>|t|)   
+    ## (Intercept)              4.845281   1.287241   3.764  0.00114 **
+    ## alphadiv.north$depth_cm -0.001613   0.020930  -0.077  0.93929   
+    ## ---
+    ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+    ## 
+    ## Residual standard error: 0.5949 on 21 degrees of freedom
+    ## Multiple R-squared:  0.0002829,  Adjusted R-squared:  -0.04732 
+    ## F-statistic: 0.005942 on 1 and 21 DF,  p-value: 0.9393
+
+``` r
+summary(lm(alphadiv.south$Shannon ~ alphadiv.south$depth_cm)) # linear model (Shannon diversity index, south site) p=0.0174***
+```
+
+    ## 
+    ## Call:
+    ## lm(formula = alphadiv.south$Shannon ~ alphadiv.south$depth_cm)
+    ## 
+    ## Residuals:
+    ##     Min      1Q  Median      3Q     Max 
+    ## -1.0027 -0.3862  0.1517  0.3826  0.7770 
+    ## 
+    ## Coefficients:
+    ##                         Estimate Std. Error t value Pr(>|t|)  
+    ## (Intercept)              1.98035    1.10802   1.787   0.0899 .
+    ## alphadiv.south$depth_cm  0.04217    0.01616   2.608   0.0173 *
+    ## ---
+    ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+    ## 
+    ## Residual standard error: 0.5161 on 19 degrees of freedom
+    ## Multiple R-squared:  0.2637, Adjusted R-squared:  0.2249 
+    ## F-statistic: 6.804 on 1 and 19 DF,  p-value: 0.01727
+
+``` r
+summary(lm(alphadiv.north$Observed ~ alphadiv.north$depth_cm)) # linear model (Observed diversity index, north site) p=0.3337
+```
+
+    ## 
+    ## Call:
+    ## lm(formula = alphadiv.north$Observed ~ alphadiv.north$depth_cm)
+    ## 
+    ## Residuals:
+    ##     Min      1Q  Median      3Q     Max 
+    ## -254.64 -136.57  -59.56   58.38  635.39 
+    ## 
+    ## Coefficients:
+    ##                         Estimate Std. Error t value Pr(>|t|)  
+    ## (Intercept)              857.915    497.393   1.725   0.0992 .
+    ## alphadiv.north$depth_cm   -8.005      8.087  -0.990   0.3335  
+    ## ---
+    ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+    ## 
+    ## Residual standard error: 229.9 on 21 degrees of freedom
+    ## Multiple R-squared:  0.04458,    Adjusted R-squared:  -0.0009204 
+    ## F-statistic: 0.9798 on 1 and 21 DF,  p-value: 0.3335
+
+``` r
+summary(lm(alphadiv.south$Observed ~ alphadiv.south$depth_cm)) # linear model (Observed diversity index, south site) p=0.00951***  
+```
+
+    ## 
+    ## Call:
+    ## lm(formula = alphadiv.south$Observed ~ alphadiv.south$depth_cm)
+    ## 
+    ## Residuals:
+    ##     Min      1Q  Median      3Q     Max 
+    ## -292.77 -207.62  -48.47  108.96  771.47 
+    ## 
+    ## Coefficients:
+    ##                          Estimate Std. Error t value Pr(>|t|)   
+    ## (Intercept)             -1163.083    552.166  -2.106  0.04869 * 
+    ## alphadiv.south$depth_cm    23.239      8.055   2.885  0.00949 **
+    ## ---
+    ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+    ## 
+    ## Residual standard error: 257.2 on 19 degrees of freedom
+    ## Multiple R-squared:  0.3046, Adjusted R-squared:  0.268 
+    ## F-statistic: 8.322 on 1 and 19 DF,  p-value: 0.00949
+
+``` r
+gg.n.alphadiv.obs <- ggplot(alphadiv.north, aes(storage_days, Observed, color=depth_cm))+
+  geom_point()+
+  geom_smooth(method = "lm", linetype="dashed", color="black")+
+  annotate("text", x=15, y=875, label = "italic(R) ^ 2 == 0.095", parse = TRUE)+
+  annotate("text", x=5, y=875, label="p = 0.153")+
+  ggtitle("Observed ASV Richness")+
+  scale_x_continuous("")+
+  scale_y_continuous("")+
+  scale_color_gradient("Depth (cm)", limits=c(50,80))+
+  facet_grid(~site)+
+  theme_bw()
+
+gg.n.alphadiv.sha <- ggplot(alphadiv.north, aes(storage_days, Shannon, color=depth_cm))+
+  geom_point()+
+  geom_smooth(method = "lm", linetype="dashed", color="black")+
+  annotate("text", x=15, y=6.5, label = "italic(R) ^ 2 == 0.075", parse = TRUE)+
+  annotate("text", x=5, y=6.5, label="p = 0.205")+
+  ggtitle("Shannon Index")+
+  scale_y_continuous("", limits = c(3.8, 6.8))+
+  scale_x_continuous("")+
+  scale_color_gradient("Depth (cm)", limits=c(50,80))+
+  facet_grid(~site)+
+  theme_bw()
+
+gg.s.alphadiv.obs <- ggplot(alphadiv.south, aes(storage_days, Observed, color=depth_cm))+
+  geom_point()+
+  geom_smooth(method = "lm", linetype="dashed", color="black")+
+  annotate("text", x=15, y=1200, label = "italic(R) ^ 2 == 0.001", parse = TRUE)+
+  annotate("text", x=5, y=1200, label="p = 0.876")+
+  scale_x_continuous("Days stored")+
+  scale_y_continuous("")+
+  scale_color_gradient("Depth (cm)", limits=c(50,80))+
+  facet_grid(~site)+
+  theme_bw()
+
+gg.s.alphadiv.sha <- ggplot(alphadiv.south, aes(storage_days, Shannon, color=depth_cm))+
+  geom_point()+
+  geom_smooth(method = "lm", linetype="dashed", color="black")+
+  annotate("text", x=15, y=6.4, label = "italic(R) ^ 2 == 0.032", parse = TRUE)+
+  annotate("text", x=5, y=6.4, label="p = 0.437")+
+  scale_x_continuous("Days stored")+
+  scale_y_continuous("", limits = c(3.8, 6.8))+
+  scale_color_gradient("Depth (cm)", limits=c(50,80))+
+  facet_grid(~site)+
+  theme_bw()
+
+# plot alpha diversity
+alphadiv.vs.time <- gg.n.alphadiv.obs + gg.n.alphadiv.sha + gg.s.alphadiv.obs + gg.s.alphadiv.sha + plot_layout(guides="collect") # no huge changes in observed ASV richness or Shannon diversity over time
+alphadiv.vs.time 
+```
+
+![](02_sequence_analysis_files/figure-gfm/alpha%20diversity%20supplemental%20figure-1.png)<!-- -->
+
+``` r
+# alpha diversity tests on unpaired samples
+# alpha diversity by scan
+t.test(alphadiv[which(alphadiv$scan=="Scanned"),]$Observed, alphadiv[which(alphadiv$scan=="Unscanned"),]$Observed) # not in observed richness
+```
+
+    ## 
+    ##  Welch Two Sample t-test
+    ## 
+    ## data:  alphadiv[which(alphadiv$scan == "Scanned"), ]$Observed and alphadiv[which(alphadiv$scan == "Unscanned"), ]$Observed
+    ## t = 1.16, df = 22.128, p-value = 0.2584
+    ## alternative hypothesis: true difference in means is not equal to 0
+    ## 95 percent confidence interval:
+    ##  -84.02284 297.50432
+    ## sample estimates:
+    ## mean of x mean of y 
+    ##  459.0000  352.2593
+
+``` r
+t.test(alphadiv[which(alphadiv$scan=="Scanned"),]$Shannon, alphadiv[which(alphadiv$scan=="Unscanned"),]$Shannon) # not in Shannon
+```
+
+    ## 
+    ##  Welch Two Sample t-test
+    ## 
+    ## data:  alphadiv[which(alphadiv$scan == "Scanned"), ]$Shannon and alphadiv[which(alphadiv$scan == "Unscanned"), ]$Shannon
+    ## t = 1.6877, df = 31.105, p-value = 0.1015
+    ## alternative hypothesis: true difference in means is not equal to 0
+    ## 95 percent confidence interval:
+    ##  -0.06337025  0.67180106
+    ## sample estimates:
+    ## mean of x mean of y 
+    ##  4.985273  4.681057
 
 ``` r
 # alpha diversity by site (north/south)
-# t.test(alphadiv[which(alphadiv$site=="North"),]$Observed, alphadiv[which(alphadiv$site=="South"),]$Observed) # not in observed richness
-# t.test(alphadiv[which(alphadiv$site=="North"),]$Shannon, alphadiv[which(alphadiv$site=="South"),]$Shannon) # not in Shannon
+t.test(alphadiv[which(alphadiv$site=="North"),]$Observed, alphadiv[which(alphadiv$site=="South"),]$Observed) # not in observed richness
+```
 
+    ## 
+    ##  Welch Two Sample t-test
+    ## 
+    ## data:  alphadiv[which(alphadiv$site == "North"), ]$Observed and alphadiv[which(alphadiv$site == "South"), ]$Observed
+    ## t = -0.66113, df = 37.364, p-value = 0.5126
+    ## alternative hypothesis: true difference in means is not equal to 0
+    ## 95 percent confidence interval:
+    ##  -218.2293  110.8255
+    ## sample estimates:
+    ## mean of x mean of y 
+    ##  367.8696  421.5714
+
+``` r
+t.test(alphadiv[which(alphadiv$site=="North"),]$Shannon, alphadiv[which(alphadiv$site=="South"),]$Shannon) # not in Shannon
+```
+
+    ## 
+    ##  Welch Two Sample t-test
+    ## 
+    ## data:  alphadiv[which(alphadiv$site == "North"), ]$Shannon and alphadiv[which(alphadiv$site == "South"), ]$Shannon
+    ## t = -0.61917, df = 41.571, p-value = 0.5392
+    ## alternative hypothesis: true difference in means is not equal to 0
+    ## 95 percent confidence interval:
+    ##  -0.4648518  0.2466292
+    ## sample estimates:
+    ## mean of x mean of y 
+    ##  4.746519  4.855630
+
+``` r
 # alpha diversity by tsunami layer
-# t.test(alphadiv[which(alphadiv$sedtype=="Estuary Sediment"),]$Observed, alphadiv[which(alphadiv$sedtype=="Tsunami Deposit"),]$Observed) # not in observed richness
-# t.test(alphadiv[which(alphadiv$sedtype=="Estuary Sediment"),]$Shannon, alphadiv[which(alphadiv$sedtype=="Tsunami Deposit"),]$Shannon) # not in Shannon
+t.test(alphadiv[which(alphadiv$sedtype=="Estuary Sediment"),]$Observed, alphadiv[which(alphadiv$sedtype=="Tsunami Deposit"),]$Observed) # not in observed richness
+```
+
+    ## 
+    ##  Welch Two Sample t-test
+    ## 
+    ## data:  alphadiv[which(alphadiv$sedtype == "Estuary Sediment"), ]$Observed and alphadiv[which(alphadiv$sedtype == "Tsunami Deposit"), ]$Observed
+    ## t = -0.10812, df = 37.999, p-value = 0.9145
+    ## alternative hypothesis: true difference in means is not equal to 0
+    ## 95 percent confidence interval:
+    ##  -166.5929  149.7000
+    ## sample estimates:
+    ## mean of x mean of y 
+    ##  390.4286  398.8750
+
+``` r
+t.test(alphadiv[which(alphadiv$sedtype=="Estuary Sediment"),]$Shannon, alphadiv[which(alphadiv$sedtype=="Tsunami Deposit"),]$Shannon) # not in Shannon
+```
+
+    ## 
+    ##  Welch Two Sample t-test
+    ## 
+    ## data:  alphadiv[which(alphadiv$sedtype == "Estuary Sediment"), ]$Shannon and alphadiv[which(alphadiv$sedtype == "Tsunami Deposit"), ]$Shannon
+    ## t = -0.5096, df = 36.28, p-value = 0.6134
+    ## alternative hypothesis: true difference in means is not equal to 0
+    ## 95 percent confidence interval:
+    ##  -0.4417711  0.2643071
+    ## sample estimates:
+    ## mean of x mean of y 
+    ##  4.766329  4.855061
+
+``` r
+# alpha diversity tests on paired samples
+alphadiv.paired <- alphadiv %>% filter(is.paired=="y")
+
+# alpha diversity by scan
+t.test(alphadiv.paired[which(alphadiv.paired$scan=="Scanned"),]$Observed, alphadiv.paired[which(alphadiv.paired$scan=="Unscanned"),]$Observed) # not in observed richness
+```
+
+    ## 
+    ##  Welch Two Sample t-test
+    ## 
+    ## data:  alphadiv.paired[which(alphadiv.paired$scan == "Scanned"), ]$Observed and alphadiv.paired[which(alphadiv.paired$scan == "Unscanned"), ]$Observed
+    ## t = 0.16162, df = 12.041, p-value = 0.8743
+    ## alternative hypothesis: true difference in means is not equal to 0
+    ## 95 percent confidence interval:
+    ##  -291.5424  338.2774
+    ## sample estimates:
+    ## mean of x mean of y 
+    ##  424.4444  401.0769
+
+``` r
+t.test(alphadiv.paired[which(alphadiv.paired$scan=="Scanned"),]$Shannon, alphadiv.paired[which(alphadiv.paired$scan=="Unscanned"),]$Shannon) # not in Shannon
+```
+
+    ## 
+    ##  Welch Two Sample t-test
+    ## 
+    ## data:  alphadiv.paired[which(alphadiv.paired$scan == "Scanned"), ]$Shannon and alphadiv.paired[which(alphadiv.paired$scan == "Unscanned"), ]$Shannon
+    ## t = 0.16556, df = 19.556, p-value = 0.8702
+    ## alternative hypothesis: true difference in means is not equal to 0
+    ## 95 percent confidence interval:
+    ##  -0.4762847  0.5582777
+    ## sample estimates:
+    ## mean of x mean of y 
+    ##  4.856067  4.815070
+
+``` r
+# alpha diversity by site (north/south) (threw a bunch of errors during Knitting)
+# t.test(alphadiv.paired[which(alphadiv.paired$site=="North"),]$Observed, alphadiv.paired[which(alphadiv.paired$site=="South"),]$Observed) # not in observed richness
+# t.test(alphadiv.paired[which(alphadiv.paired$site=="North"),]$Shannon, alphadiv.paired[which(alphadiv.paired$site=="South"),]$Shannon) # not in Shannon
+# alpha diversity by tsunami layer
+# t.test(alphadiv.paired[which(alphadiv.paired$sedtype=="Estuary Sediment"),]$Observed, alphadiv.paired[which(alphadiv.paired$sedtype=="Tsunami Deposit"),]$Observed) # not in observed richness
+# t.test(alphadiv.paired[which(alphadiv.paired$sedtype=="Estuary Sediment"),]$Shannon, alphadiv.paired[which(alphadiv.paired$sedtype=="Tsunami Deposit"),]$Shannon) # not in Shannon
 ```
 
 ## 3\) Normalizations and ordinations
@@ -711,21 +1084,26 @@ ord9 <- plot_ordination(ps4.css.south, ord.ps4.css.south.pcoa.wu, color="storage
   geom_text(aes(label=depth_cm), size=3, nudge_x = 0.01, nudge_y = 0.01) +
   scale_color_continuous("Storage (days)") +
   theme_bw()
-ord10 <- plot_ordination(ps4.css.north, ord.ps4.css.north.pcoa.wu, color="position") +
+
+# relabel "above within below"
+sample_data(ps4.css.north)$layer <- factor(sample_data(ps4.css.north)$position, levels = c("Above", "Within", "Below"), labels = c("Shallow", "Middle", "Deep"))
+sample_data(ps4.css.south)$layer <- factor(sample_data(ps4.css.south)$position, levels = c("Above", "Within", "Below"), labels = c("Shallow", "Middle", "Deep"))
+
+ord10 <- plot_ordination(ps4.css.north, ord.ps4.css.north.pcoa.wu, color="layer") +
   geom_point(size=2) +
   stat_ellipse() +
   geom_text(aes(label=depth_cm), size=3, color="black", nudge_x = 0.015, nudge_y = 0.012) +
-  ggtitle("B") +
-  geom_text(aes(label="North Site"), color="black", x=0.1, y=0.16, show.legend = FALSE) +
+  scale_color_manual("Sediment Layer", values = c("#3B9AB2","#EBCC2A", "#F12A00")) +
+  labs(title = "B", subtitle = "North Site") +
   theme_bw() +
   theme(legend.position = "none")
-ord11 <- plot_ordination(ps4.css.south, ord.ps4.css.south.pcoa.wu, color="position") +
+
+ord11 <- plot_ordination(ps4.css.south, ord.ps4.css.south.pcoa.wu, color="layer") +
   geom_point(size=2) +
   stat_ellipse() +
   geom_text(aes(label=depth_cm), size=3, color="black", nudge_x = 0.015, nudge_y = 0.015) +
-  scale_color_discrete("Position relative to \nTsunami Layer") +
-  ggtitle("C") +
-  geom_text(aes(label="South Site"), color="black", x=-0.13, y=0.17, show.legend = FALSE) +
+  scale_color_manual("Sediment Layer", values = c("#3B9AB2","#EBCC2A", "#F12A00")) +
+  labs(title = "C", subtitle = "South Site") +
   theme_bw()
 
 # final ordination plots
@@ -733,11 +1111,10 @@ gg.ord.all <- plot_ordination(ps4.css, ord.ps4.css.pcoa.wu, color="scan", shape=
   geom_point(size=2) +
   scale_shape_discrete("Coring Site") +
   scale_color_discrete("Treatment") +
-  ggtitle("A") +
-  geom_text(aes(label="Both Sites"), color="black", x=-0.1, y=0.2, show.legend = FALSE) +
+  labs(title = "A", subtitle = "All Samples") +
   theme_bw() # PCoA weighted unifrac, CSS
 
-gg.ord.final <- gg.ord.all + ord10 + ord11
+gg.ord.final <- gg.ord.all / (ord10 + ord11)
 gg.ord.final
 ```
 
@@ -764,6 +1141,7 @@ df.ps4.css.p <- as(sample_data(ps4.css.p), "data.frame")
 ```
 
 ``` r
+# these tests threw errors that prevented Knitting
 # CT scanning makes little difference (unpaired first), transformation type doesn't really matter, distance metric does
 adonis(phyloseq::distance(ps4.css, method="jaccard") ~ scan, data = df.ps4.css) # scan explains 2.4% of community, p=0.36
 adonis(phyloseq::distance(ps4.css, method="bray") ~ scan, data = df.ps4.css) # scan explains 2.1% of community, p=0.45
@@ -953,19 +1331,20 @@ sessionInfo
     ## [8] methods   base     
     ## 
     ## other attached packages:
-    ##  [1] here_0.1                    patchwork_1.0.0            
-    ##  [3] metagenomeSeq_1.26.3        RColorBrewer_1.1-2         
-    ##  [5] glmnet_3.0-2                Matrix_1.2-18              
-    ##  [7] limma_3.40.6                vegan_2.5-6                
-    ##  [9] lattice_0.20-38             permute_0.9-5              
-    ## [11] DESeq2_1.24.0               SummarizedExperiment_1.14.1
-    ## [13] DelayedArray_0.10.0         BiocParallel_1.18.1        
-    ## [15] matrixStats_0.55.0          Biobase_2.44.0             
-    ## [17] GenomicRanges_1.36.1        GenomeInfoDb_1.20.0        
-    ## [19] IRanges_2.18.3              S4Vectors_0.22.1           
-    ## [21] BiocGenerics_0.30.0         phyloseq_1.28.0            
-    ## [23] ggplot2_3.2.1               dplyr_0.8.4                
-    ## [25] plyr_1.8.5                  tidyr_1.0.2                
+    ##  [1] here_0.1                    wesanderson_0.3.6          
+    ##  [3] patchwork_1.0.0             metagenomeSeq_1.26.3       
+    ##  [5] RColorBrewer_1.1-2          glmnet_3.0-2               
+    ##  [7] Matrix_1.2-18               limma_3.40.6               
+    ##  [9] vegan_2.5-6                 lattice_0.20-38            
+    ## [11] permute_0.9-5               DESeq2_1.24.0              
+    ## [13] SummarizedExperiment_1.14.1 DelayedArray_0.10.0        
+    ## [15] BiocParallel_1.18.1         matrixStats_0.55.0         
+    ## [17] Biobase_2.44.0              GenomicRanges_1.36.1       
+    ## [19] GenomeInfoDb_1.20.0         IRanges_2.18.3             
+    ## [21] S4Vectors_0.22.1            BiocGenerics_0.30.0        
+    ## [23] phyloseq_1.28.0             ggplot2_3.2.1              
+    ## [25] dplyr_0.8.4                 plyr_1.8.5                 
+    ## [27] tidyr_1.0.2                
     ## 
     ## loaded via a namespace (and not attached):
     ##   [1] colorspace_1.4-1       rprojroot_1.3-2        htmlTable_1.13.3      
