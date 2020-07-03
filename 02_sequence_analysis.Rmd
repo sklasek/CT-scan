@@ -1,9 +1,11 @@
 ---
 title: "02_sequence_analysis.Rmd"
 author: "Scott Klasek"
-date: "6/7/2020"
+date: "7/3/2020"
 output: github_document
 ---
+
+## Microbial community analysis and generation of figures 
 
 ## 0) load libraries and import phyloseq object:
 
@@ -510,6 +512,18 @@ gg.biom.scan <- ggplot(df.biom.scan, aes(x=asvorder, y=100*relabund, fill=Phylum
   theme(strip.text = element_text(size = 11))
 
 gg.biom.scan
+
+# for graphical abstract
+df.biom.scan.scanned <- df.biom.scan %>% filter(treatment=="Scanned")
+gg.biom.scan.scanned <- ggplot(df.biom.scan.scanned, aes(x=asvorder, y=100*relabund, fill=Phylum)) + 
+  geom_bar(stat="identity") + 
+  scale_fill_brewer(palette = "Set2") +
+  scale_y_continuous("Percent abundance of \ntotal community", limits = c(0,0.7)) +
+  scale_x_discrete("") +
+  coord_flip() +
+  ggtitle("") +
+  theme_bw() +
+  theme(legend.position = "none")
 ```
 
 # Package versions:

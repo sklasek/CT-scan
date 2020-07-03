@@ -1,7 +1,9 @@
 02\_sequence\_analysis.Rmd
 ================
 Scott Klasek
-6/7/2020
+7/3/2020
+
+## Microbial community analysis and generation of figures
 
 ## 0\) load libraries and import phyloseq object:
 
@@ -1307,6 +1309,20 @@ gg.biom.scan
     ## Warning: Removed 4 rows containing missing values (geom_text).
 
 ![](02_sequence_analysis_files/figure-gfm/biomarkers-1.png)<!-- -->
+
+``` r
+# for graphical abstract
+df.biom.scan.scanned <- df.biom.scan %>% filter(treatment=="Scanned")
+gg.biom.scan.scanned <- ggplot(df.biom.scan.scanned, aes(x=asvorder, y=100*relabund, fill=Phylum)) + 
+  geom_bar(stat="identity") + 
+  scale_fill_brewer(palette = "Set2") +
+  scale_y_continuous("Percent abundance of \ntotal community", limits = c(0,0.7)) +
+  scale_x_discrete("") +
+  coord_flip() +
+  ggtitle("") +
+  theme_bw() +
+  theme(legend.position = "none")
+```
 
 # Package versions:
 
