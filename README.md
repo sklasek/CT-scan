@@ -1,6 +1,9 @@
-CT-scan
-7/3/2020
-Scott Klasek
+---
+title: "CT-scan"
+author: "Scott Klasek"
+date: "11/17/2020"
+output: github_document
+---
 
 This repo shows codes for analyzing sediment microbial community responses to X-ray CT scanning.
 Sequence data are 16S rRNA V4 hypervariable regions available at https://www.ncbi.nlm.nih.gov/bioproject/PRJNA533633
