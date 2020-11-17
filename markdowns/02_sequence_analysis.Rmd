@@ -501,7 +501,7 @@ df.biom.scan$tax.label <- rep(specific.taxon, times=2)
 # Graph biomarkers
 gg.biom.scan <- ggplot(df.biom.scan, aes(x=asvorder, y=100*relabund, fill=Phylum)) + 
   geom_bar(stat="identity") + 
-  geom_text(aes(label=tax.label), hjust="left", size=3) +
+  geom_text(aes(label=tax.label), hjust="left", size=2.9) +
   scale_fill_brewer(palette = "Set2") +
   scale_y_continuous("Percent abundance of total community", limits = c(0,1)) +
   scale_x_discrete("") +
