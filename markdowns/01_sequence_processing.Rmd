@@ -173,7 +173,7 @@ dna <- Biostrings::DNAStringSet(taxa_names(ps1))
 names(dna) <- taxa_names(ps1)
 ps1 <- merge_phyloseq(ps1, dna)
 taxa_names(ps1) <- paste0("ASV", seq(ntaxa(ps1)))
-saveRDS(ps1, file = "ps1")
+saveRDS(ps1, file = "~/Desktop/collabs/CT_scan_communities/CT-scan/data/ps1")
 ps1
 ```
 
@@ -241,7 +241,7 @@ df.ct[1:12,] # ten samples have fewer reads than the blank and should obviously 
 ps4 <- prune_samples(sample_sums(ps3)>=4622, ps3) # remove samples with < 4622 reads
 ps4 <- prune_taxa(taxa_sums(ps4) > 0, ps4) # remove taxa that were only present in samples that have been removed
 ps4
-saveRDS(ps4, file = "ps4")
+saveRDS(ps4, file = "~/Desktop/collabs/CT_scan_communities/CT-scan/data/ps4")
 ```
 
 

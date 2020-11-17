@@ -23,7 +23,7 @@ library(RColorBrewer)
 library(wesanderson)
 library(here)
 here()
-ps4 <- readRDS(file = "ps4")
+ps4 <- readRDS(file = "~/Desktop/collabs/CT_scan_communities/CT-scan/data/ps4")
 ```
 
 ## 1) Bar plots showing high-level (class) community composition of all samples: 
@@ -149,7 +149,7 @@ ntaxa(tax_table(ps4.ra.ig)) # 27, so two that are biomarkers for Unscanned isn't
 ## 2) Alpha diversity analysis of all samples
 
 ```{r, alpha diversity supplemental figure}
-paircode <- read.csv(file="paircode.csv") # import the file showing which samples are paired with one another
+paircode <- read.csv(file="~/Desktop/collabs/CT_scan_communities/CT-scan/data/paircode.csv") # import the file showing which samples are paired with one another
 sample_data(ps4) <- data.frame(sample_data(ps4), paircode) # add this info to the ps object
 
 alphadiv <- estimate_richness(ps4, measures = c("Observed", "Shannon")) # calculate alpha diversity
