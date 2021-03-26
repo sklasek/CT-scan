@@ -3,7 +3,7 @@
 How X-ray CT scanning affects microbial communities in sediments
 
 Authors: Erica Ewton, Scott Klasek, Erin Peck, Jason Wiest, and Frederick Colwell   
-Publication: Not published yet.   
+Publication: [In press in Frontiers in Microbiology.](https://www.frontiersin.org/articles/10.3389/fmicb.2021.584676/abstract)   
 
 **Reproducible workflow:**    
 This repo shows codes for analyzing sediment microbial community responses to X-ray CT scanning.   
